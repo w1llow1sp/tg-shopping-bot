@@ -1,4 +1,4 @@
-import { Telegraf } from 'telegraf';
+import {Telegraf} from 'telegraf';
 import * as dotenv from 'dotenv';
 // конфиг грузим
 dotenv.config();
@@ -21,9 +21,11 @@ bot.on('text', (ctx) => {
             `Добро пожаловать в наш магазин, ${username}! Для взаимодействия нажмите следующие кнопки:`,
             {
                 reply_markup: {
-                    keyboard: [['Каталог'], ['Корзина'], ['Заказы']],
-                    resize_keyboard: true,
-                    one_time_keyboard: false,
+                    inline_keyboard: [
+                        [{text: 'Каталог 🗂', callback_data: 'catalog'}],
+                        [{text: 'Корзина 🧺', callback_data: 'cart'}],
+                        [{text: 'Заказы 📌', callback_data: 'orders'}],
+                    ],
                 },
             }
         );
@@ -31,22 +33,23 @@ bot.on('text', (ctx) => {
         console.log(`Приветствие отправлено для ${username}`);
         return
     }
-    // Обработка кнопок
-    switch (messageText) {
-        case 'Каталог':
-            ctx.reply('Ты в каталоге!');
-            break;
-        case 'Корзина':
-            ctx.reply('Твоя корзина пока пуста.');
-            break;
-        case 'Заказы':
-            ctx.reply('Твои заказы (пока их нет).');
-            break;
-        default:
-            ctx.reply('Выбери одну из кнопок ниже!');
-    }
+    ctx.reply('Используй кнопки под приветствием!');
+});
+// Обработка inline-кнопок
+bot.action('catalog', (ctx) => {
+    ctx.answerCbQuery(); // Убирает "часики" на кнопке
+    ctx.reply('Ты в каталоге!');
 });
 
+bot.action('cart', (ctx) => {
+    ctx.answerCbQuery();
+    ctx.reply('Твоя корзина пока пуста.');
+});
+
+bot.action('orders', (ctx) => {
+    ctx.answerCbQuery();
+    ctx.reply('Твои заказы (пока их нет).');
+});
 
 
 bot.launch()
