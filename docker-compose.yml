@@ -1,7 +1,23 @@
 
 services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+        - .:/app
+        - /app/node_modules
+    working_dir: /app
+    command: npx tsx src/index.tsx
+    environment:
+        - NODE_ENV=development
+    depends_on:
+        - postgres
+    ports:
+        - "3000:3000"
 
   server: &default_service
+
     build:
       context: .
     depends_on:
@@ -17,7 +33,7 @@ services:
     environment:
       - POSTGRESQL_DSN
 
-  postgres: &postgres
+  postgres:
     image: postgres:17
     volumes:
       - postgres-data:/var/lib/postgresql/data
@@ -31,7 +47,7 @@ services:
       timeout: 2s
       retries: 10
 
-  redis: &redis
+  redis:
     image: redis:6
     command: redis-server --maxmemory 256Mb --databases 30
     restart: "no"
@@ -43,7 +59,7 @@ services:
       timeout: 2s
       retries: 10
 
-  rabbitmq: &rabbit
+  rabbitmq:
     image: rabbitmq:3.8-management-alpine
     environment:
       RABBITMQ_DEFAULT_USER: "guest"
@@ -72,7 +88,7 @@ services:
     environment:
       - POSTGRESQL_DSN
 
-  dbmate:  # migration tool
+  dbmate:  # migrations tool
     image: amacneil/dbmate:latest
     container_name: dbmate
     network_mode: host  # use network of host to connect to local postgres

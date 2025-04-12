@@ -5,7 +5,9 @@
   "scripts": {
     "start": "ts-node src/index.ts",
     "lint": "eslint src/**/*.ts",
-    "format": "prettier --write src/**/*.ts"
+    "format": "prettier --write src/**/*.ts",
+    "migrate": "node-pg-migrate -m src/db/migrations up",
+    "migrate:down": "node-pg-migrate -m src/db/migrations down"
   },
   "keywords": [],
   "author": "",
@@ -14,14 +16,20 @@
   "dependencies": {
     "@types/node": "^22.14.0",
     "dotenv": "^16.4.7",
-    "telegraf": "^4.16.3",
+    "express": "^5.1.0",
+    "grammy": "^1.35.1",
+    "node-pg-migrate": "^7.9.1",
+    "pg": "^8.14.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
   },
   "devDependencies": {
+    "@types/express": "^5.0.1",
+    "@types/pg": "^8.11.11",
     "@typescript-eslint/eslint-plugin": "^8.29.0",
     "@typescript-eslint/parser": "^8.29.0",
     "eslint": "^9.24.0",
-    "prettier": "^3.5.3"
+    "prettier": "^3.5.3",
+    "tsx": "^4.19.3"
   }
 }
