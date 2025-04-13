@@ -3,35 +3,18 @@ services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile
     volumes:
         - .:/app
-        - /app/node_modules
-    working_dir: /app
-    command: npx tsx src/index.tsx
     environment:
-        - NODE_ENV=development
-    depends_on:
-        - postgres
-    ports:
-        - "3000:3000"
-
-  server: &default_service
-
-    build:
-      context: .
+        - NODE_ENV
+        - POSTGRESQL_DSN
+        - WEBHOOK_URL
+        - BOT_TOKEN
     depends_on:
       postgres:
         condition: service_healthy
-    #      redis:
-    #        condition: service_started
-    #      rabbitmq:
-    #        condition: service_healthy
-    command: node blablabla
-    volumes:
-      - .:/app
-    environment:
-      - POSTGRESQL_DSN
+    ports:
+        - "3000:3000"
 
   postgres:
     image: postgres:17
@@ -48,7 +31,7 @@ services:
       retries: 10
 
   redis:
-    image: redis:6
+    image: redis:7
     command: redis-server --maxmemory 256Mb --databases 30
     restart: "no"
     ports:
@@ -60,7 +43,7 @@ services:
       retries: 10
 
   rabbitmq:
-    image: rabbitmq:3.8-management-alpine
+    image: rabbitmq:4
     environment:
       RABBITMQ_DEFAULT_USER: "guest"
       RABBITMQ_DEFAULT_PASS: "guest"
@@ -73,25 +56,9 @@ services:
       timeout: 2s
       retries: 10
 
-  test:
-    <<: *default_service
-    build:
-      context: .
-      target: developer
-    depends_on:
-      postgres:
-        condition: service_healthy
-    #      redis_test:
-    #        condition: service_started
-    #      rabbitmq_test:
-    #        condition: service_healthy
-    environment:
-      - POSTGRESQL_DSN
-
-  dbmate:  # migrations tool
+  dbmate:  # migration tool
     image: amacneil/dbmate:latest
     container_name: dbmate
-    network_mode: host  # use network of host to connect to local postgres
     volumes:
       - ./db:/db
 
