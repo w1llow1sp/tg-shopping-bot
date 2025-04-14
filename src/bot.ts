@@ -1,6 +1,7 @@
 import { Bot } from 'grammy';
 import { env } from './consts';
-import { registerMenu } from './services/menu/service';
+import { MenuService } from './services/menu/service';
+import { pool } from './db/db';
 
 if (!env.BOT_TOKEN || !env.WEBHOOK_URL) {
   throw new Error('BOT_TOKEN и WEBHOOK_URL должны быть указаны в .env');
@@ -8,10 +9,9 @@ if (!env.BOT_TOKEN || !env.WEBHOOK_URL) {
 export const WEBHOOK_PATH = `/webhook/${env.BOT_TOKEN}`;
 
 export const bot = new Bot(env.BOT_TOKEN);
-registerMenu(bot)  // регистрируем обработчики для меню
-// registerCatalog(bot)  // регистрируем обработчики для каталога
-// registerOrders(bot)  // регистрируем обработчики для заказов
-
+new MenuService(bot, pool); // регистрируем обработчики для меню
+// registerCatalog(bot, pool)  // регистрируем обработчики для каталога
+// registerOrders(bot, pool)  // регистрируем обработчики для заказов
 
 export async function setWebhook() {
   const webhookUrl = `${env.WEBHOOK_URL}${WEBHOOK_PATH}`;
