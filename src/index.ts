@@ -1,61 +1,11 @@
 import express from 'express';
-import { Bot, webhookCallback, Context } from 'grammy';
-import dotenv from 'dotenv';
+import { webhookCallback } from 'grammy';
+import * as bot from './bot';
+import * as db from './db/db';
+import { env } from './consts';
 
-
-dotenv.config();
-
-// Проверка переменных окружения
-interface Env {
-    BOT_TOKEN: string;
-    WEBHOOK_URL: string;
-    PORT?: string;
-}
-
-const env: Env = {
-    BOT_TOKEN: process.env.BOT_TOKEN || '',
-    WEBHOOK_URL: process.env.WEBHOOK_URL || '',
-    PORT: process.env.PORT || '3000',
-};
-
-if (!env.BOT_TOKEN || !env.WEBHOOK_URL) {
-    throw new Error('BOT_TOKEN и WEBHOOK_URL должны быть указаны в .env');
-}
-
-const bot = new Bot(env.BOT_TOKEN);
 const app = express();
 app.use(express.json());
-
-// Храним пользователей, получивших приветствие
-const greetedUsers = new Set<number>();
-
-// Приветствие с inline-кнопками
-bot.on('message:text', (ctx: Context) => {
-    const userId = ctx.from?.id;
-    if (!userId) return;
-
-    const username = ctx.from?.username ? `@${ctx.from.username}` : ctx.from?.first_name || 'пользователь';
-
-    if (!greetedUsers.has(userId)) {
-        ctx.reply(
-            `Добро пожаловать в наш магазин, ${username}! Для взаимодействия нажмите следующие кнопки:`,
-            {
-                reply_markup: {
-                    inline_keyboard: [
-                        [{ text: 'Каталог', callback_data: 'catalog_0' }],
-                        [{ text: 'Корзина', callback_data: 'cart' }],
-                        [{ text: 'Заказы', callback_data: 'orders' }],
-                    ],
-                },
-            }
-        );
-        greetedUsers.add(userId);
-        console.log(`Приветствие отправлено для ${username}`);
-        return;
-    }
-
-    ctx.reply('Используй кнопки под приветствием!');
-});
 
 // Показ каталога с пагинацией (4 в ряд)
 /*bot.on('callback_query:data', async (ctx) => {
@@ -198,18 +148,12 @@ async function getNextItemId(currentId: number): Promise<number> {
 }*/
 
 // Настройка вебхуков
-const WEBHOOK_PATH = `/webhook/${env.BOT_TOKEN}`;
-app.use(WEBHOOK_PATH, webhookCallback(bot, 'express'));
+app.use(bot.WEBHOOK_PATH, webhookCallback(bot.bot, 'express'));
 
 const PORT = parseInt(env.PORT || '3000', 10);
 app.listen(PORT, async () => {
-    console.log(`Server started on port ${PORT}`);
+  console.log(`Server started on port ${PORT}`);
 
-    const webhookUrl = `${env.WEBHOOK_URL}${WEBHOOK_PATH}`;
-    try {
-        await bot.api.setWebhook(webhookUrl);
-        console.log(`Webhook url set: ${webhookUrl}`);
-    } catch (error) {
-        console.error('Error setting webhook url:', error);
-    }
+  await bot.setWebhook();
+  await db.initializePool();
 });
