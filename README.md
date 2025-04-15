@@ -81,18 +81,19 @@ make docker/up
 ## **Makefile Commands**
 The project includes a `Makefile` for easier management. Below are the available commands:
 
-| Command                  | Description                              |
-|--------------------------|------------------------------------------|
-| `make setup`             | Install dependencies                    |
-| `make local/up`          | Run the bot locally                     |
-| `make docker/build`      | Build the Docker image                  |
-| `make docker/up`         | Start the bot container                 |
-| `make docker/down`       | Stop all containers                     |
-| `make db/up`             | Start the PostgreSQL database           |
-| `make db/down`           | Stop the PostgreSQL database            |
-| `make db/migrations/up`  | Apply database migrations               |
-| `make db/migrations/down`| Rollback database migrations            |
-| `make lint`              | Run ESLint                              |
+| Command                   | Description                   |
+|---------------------------|-------------------------------|
+| `make setup`              | Install dependencies          |
+| `make test`               | Run tests using docker        |
+| `make local/up`           | Run the bot locally           |
+| `make docker/build`       | Build the Docker image        |
+| `make docker/up`          | Start the bot container       |
+| `make docker/down`        | Stop all containers           |
+| `make db/up`              | Start the PostgreSQL database |
+| `make db/down`            | Stop the PostgreSQL database  |
+| `make db/migrations/up`   | Apply database migrations     |
+| `make db/migrations/down` | Rollback database migrations  |
+| `make lint`               | Run ESLint                    |
 
 ---
 

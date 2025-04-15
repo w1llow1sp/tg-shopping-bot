@@ -1,18 +1,18 @@
 import { Bot } from 'grammy';
-import { Pool } from 'pg';
+import { MenuRepository } from './repository';
 
 export class MenuService {
   private bot: Bot;
-  private db: Pool;
+  private repository: MenuRepository;
 
   /**
    * Конструктор класса MenuService.
    * @param bot - Экземпляр бота grammy.
-   * @param db - Экземпляр пула соединений PostgreSQL.
+   * @param repository - Экземпляр репозитория.
    */
-  constructor(bot: Bot, db: Pool) {
+  constructor(bot: Bot, repository: MenuRepository) {
     this.bot = bot;
-    this.db = db;
+    this.repository = repository;
 
     // Регистрируем обработчики
     this.registerMenu();
@@ -25,9 +25,6 @@ export class MenuService {
     // Обработчик команды /start
     this.bot.command('start', async (ctx) => {
       try {
-        // Выполняем запрос к базе данных
-        const dbVersion = await this.db.query('SELECT version();');
-        console.log('Версия базы данных:', dbVersion.rows[0]);
 
         // Получаем имя пользователя
         const username = ctx.from?.username

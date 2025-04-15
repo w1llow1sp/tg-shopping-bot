@@ -2,6 +2,7 @@
 export
 
 .PHONY: setup \
+	test \
 	local/up \
 	docker/build docker/up docker/down \
 	db/up db/down db/migrations/up db/migrations/down \
@@ -22,6 +23,9 @@ dbmate-args := \
 setup: .check-node .install-deps .install-tsx
 	git config core.hooksPath .husky
 	@echo "Setup finished!"
+
+test: db/up db/migrations/up
+	$(DC_CMD) run --rm app npm run test
 
 local/up:
 	npx tsx src/index.ts
