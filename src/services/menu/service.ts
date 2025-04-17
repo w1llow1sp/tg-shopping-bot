@@ -1,79 +1,68 @@
-import { Bot } from 'grammy';
+import { Bot, Context } from 'grammy';
 import { Pool } from 'pg';
+import { MenuRepository } from './repository';
+import { MenuView } from './view';
 
-export class MenuService {
+export class MenuController {
   private bot: Bot;
-  private db: Pool;
+  private repository: MenuRepository;
+  private view: MenuView;
 
-  /**
-   * Конструктор класса MenuService.
-   * @param bot - Экземпляр бота grammy.
-   * @param db - Экземпляр пула соединений PostgreSQL.
-   */
   constructor(bot: Bot, db: Pool) {
     this.bot = bot;
-    this.db = db;
-
-    // Регистрируем обработчики
-    this.registerMenu();
+    this.repository = new MenuRepository(db);
+    this.view = new MenuView();
+    this.registerHandlers();
   }
 
-  /**
-   * Регистрация команды /start и обработчиков кнопок меню.
-   */
-  private registerMenu() {
-    // Обработчик команды /start
+  private registerHandlers() {
     this.bot.command('start', async (ctx) => {
       try {
-        // Выполняем запрос к базе данных
-        const dbVersion = await this.db.query('SELECT version();');
-        console.log('Версия базы данных:', dbVersion.rows[0]);
-
-        // Получаем имя пользователя
+        const dbVersion = await this.repository.checkDbConnection();
+        console.log('Версия базы данных:', dbVersion);
         const username = ctx.from?.username
           ? `@${ctx.from.username}`
           : ctx.from?.first_name || 'пользователь';
-
-        // Отправляем приветственное сообщение с кнопками
-        await ctx.reply(
-          `Добро пожаловать в наш магазин, ${username}! Для взаимодействия нажмите следующие кнопки:`,
-          {
-            reply_markup: {
-              inline_keyboard: [
-                [{ text: 'Каталог', callback_data: 'catalog' }],
-                [{ text: 'Корзина', callback_data: 'cart' }],
-                [{ text: 'Заказы', callback_data: 'order' }],
-              ],
-            },
-          },
-        );
+        const response = this.view.renderWelcomeMessage(username);
+        console.log('Sending welcome message:', JSON.stringify(response, null, 2));
+        await ctx.reply(response.text, { reply_markup: response.reply_markup });
       } catch (error) {
         console.error('Ошибка обработки команды /start:', error);
-        await ctx.reply('Произошла ошибка. Попробуйте позже.');
+        await ctx.reply(this.view.renderErrorMessage());
       }
     });
+  }
 
-    // Обработчик нажатий на кнопки меню
-    this.bot.on('callback_query:data', async (ctx) => {
-      const callbackData = ctx.callbackQuery.data;
-      console.log('Нажата кнопка:', callbackData);
+  async handleCallback(ctx: Context) {
+    if (!ctx.callbackQuery) {
+      console.error('Callback query is undefined in MenuController');
+      return;
+    }
+    const callbackData = ctx.callbackQuery.data;
+    console.log('MenuController callback:', callbackData);
 
-      switch (callbackData) {
-        case 'catalog':
-          await ctx.reply('Вы открыли каталог товаров.');
-          break;
-        case 'cart':
-          await ctx.reply('Ваша корзина пуста.');
-          break;
-        case 'order':
-          await ctx.reply('У вас пока нет заказов.');
-          break;
-        default:
-          await ctx.reply('Неизвестная команда.');
+    if (callbackData === 'catalog') {
+      console.log('Skipping catalog callback in MenuController');
+      return;
+    }
+
+    switch (callbackData) {
+      case 'cart':
+        await ctx.reply(this.view.renderCartMessage());
+        break;
+      case 'order':
+        await ctx.reply(this.view.renderOrderMessage());
+        break;
+      case 'main': {
+        const username = ctx.from?.username
+          ? `@${ctx.from.username}`
+          : ctx.from?.first_name || 'пользователь';
+        const response = this.view.renderWelcomeMessage(username);
+        await ctx.reply(response.text, { reply_markup: response.reply_markup });
+        break;
       }
-
-      // Закрываем уведомление о нажатии кнопки
-      await ctx.answerCallbackQuery();
-    });
+      default:
+        await ctx.reply(this.view.renderUnknownCommandMessage());
+    }
   }
 }
