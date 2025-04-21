@@ -1,8 +1,9 @@
 import { InlineKeyboard } from 'grammy';
+import { CallbackDataRoutes } from '../../consts';
 
 // Интерфейс для ответа, согласованный с MenuController
 export interface Response {
-  text: string;
+  text?: string;
   reply_markup?: InlineKeyboard;
 }
 
@@ -15,11 +16,11 @@ export class MenuView {
   renderWelcomeMessage(username: string): Response {
     const text = `Добро пожаловать в наш магазин, ${username}! Выберите действие:`;
     const reply_markup = new InlineKeyboard()
-      .text('Каталог', 'catalog')
+      .text('🥦Каталог', CallbackDataRoutes.catalog + ':0')
       .row()
-      .text('Корзина', 'cart')
+      .text('🧺Корзина', CallbackDataRoutes.cart)
       .row()
-      .text('Заказы', 'order');
+      .text('🥬Заказы', CallbackDataRoutes.orders);
     return { text, reply_markup };
   }
 

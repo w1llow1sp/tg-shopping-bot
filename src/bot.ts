@@ -1,7 +1,14 @@
 import { Bot } from 'grammy';
 import { env } from './consts';
 import { MenuService } from './services/menu/service';
-import { pool } from './db/db';
+import { pool } from './db/pg';
+import { CatalogService } from './services/catalog/service';
+import { CatalogRepository } from './services/catalog/repository';
+import { MenuRepository } from './services/menu/repository';
+import { CartRepository } from './services/cart/repository';
+import { CartService } from './services/cart/service';
+import { RedisConn } from './db/redis';
+import { MessageController } from './message';
 
 
 if (!env.BOT_TOKEN || !env.WEBHOOK_URL) {
@@ -11,33 +18,17 @@ export const WEBHOOK_PATH = `/webhook/${env.BOT_TOKEN}`;
 
 export const bot = new Bot(env.BOT_TOKEN);
 
+const messageController = new MessageController(bot, RedisConn)
 
-// Инициализация контроллеров
-console.log('Initializing MenuController');
-const menuService = new MenuService(bot, pool);
+const menuRepository = new MenuRepository(pool);
+new MenuService(bot, menuRepository, messageController);
 
+const catalogRepository = new CatalogRepository(pool);
+new CatalogService(bot, catalogRepository, messageController);
 
-bot.on('callback_query:data', async (ctx) => {
-  if (!ctx.callbackQuery) {
-    console.error('Callback query is undefined');
-    return;
-  }
-  const callbackData = ctx.callbackQuery.data;
-  console.log('Global callback received:', callbackData);
+const cartRepository = new CartRepository(RedisConn);
+new CartService(bot, cartRepository, messageController);
 
-  try {
-    console.log('Delegating to MenuController');
-    await menuService.handleCallback(ctx);
-
-    await ctx.answerCallbackQuery();
-  } catch (error) {
-    console.error('Error processing callback:', error);
-    await ctx.reply('Произошла ошибка. Попробуйте позже.');
-    await ctx.answerCallbackQuery().catch((err) => console.error('Error in answerCallbackQuery:', err));
-  }
-});
-// registerCatalog(bot, pool)
-// registerOrders(bot, pool)  // регистрируем обработчики для заказов
 
 export async function setWebhook() {
   const webhookUrl = `${env.WEBHOOK_URL}${WEBHOOK_PATH}`;

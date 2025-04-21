@@ -1,44 +1,72 @@
 import { Bot, Context } from 'grammy';
-import { CartModel } from './models';
+import { Cart, CartRepository, ProductCart } from './repository';
 import { CartView } from './view';
-import { Pool } from 'pg';
+import { CallbackDataRoutes } from '../../consts';
+import { MessageController } from '../../message';
 
+const addProductRexExp = new RegExp(`^${CallbackDataRoutes.cart}:add:(\\d+)$`);
+const delProductRexExp = new RegExp(`^${CallbackDataRoutes.cart}:del:(\\d+)$`);
 
 export class CartService {
   private bot: Bot;
-  private model:CartModel;
+  private repository: CartRepository;
   private view: CartView;
+  private messageController: MessageController;
 
-  constructor(bot: Bot, db: Pool,) {
+
+  constructor(bot: Bot, repository: CartRepository, messageController: MessageController) {
     this.bot = bot;
-    this.model = new CartModel();
+    this.repository = repository;
     this.view = new CartView();
+    this.messageController = messageController;
+    this.registerHandlers();
+  }
+  private registerHandlers(): void {
+    this.bot.callbackQuery(CallbackDataRoutes.cart, this.handleCart.bind(this));
+    this.bot.callbackQuery(addProductRexExp, this.handleAddProduct.bind(this));
   }
 
-  async handleCallback(ctx: Context) {
-    if (!ctx.callbackQuery) {
-      console.error('Callback query is undefined in OrderService');
-      return;
+  async handleCart(ctx: Context): Promise<void> {
+    const userId = this.messageController.getUserId(ctx)
+    if (userId === null) {
+      await this.messageController.reply(ctx, 'Произошла ошибка', {}, true)
+      return
     }
-    const callbackData = ctx.callbackQuery.data;
-    console.log('CatalogService processing callback:', callbackData);
+    const cart: Cart | null = await this.repository.getCart(userId)
+    if (cart === null || (!cart.products)){
+      const response = this.view.renderCartMessage(cart);
+      await this.messageController.reply(ctx, response.text, { reply_markup: response.reply_markup });
+    }
 
-    try {
-      if (callbackData === 'cart') {
-        /**
-         *  TODO: логика должна быть такая :
-         * 1.идет запрос на получение данных по заказу от пользователя (OrderRepository) ->
-         * 2.Эти данные отдаются в view (слой для отображения)
-         *
-         * Пока будет заглушка из view
-         */
-        const response = this.view.renderCartMessage();
-        await ctx.reply(response.text, { reply_markup: response.reply_markup });
-      }
-    }
-    catch (error) {
-      console.log('Error rendering callback:', error);
-    }
+    // TODO: render cart
+    const response = this.view.renderCartMessage(cart);
+    await this.messageController.reply(ctx, response.text, { reply_markup: response.reply_markup });
+
   }
+  async handleAddProduct(ctx: Context): Promise<void> {
+    const match = ctx.callbackQuery?.data?.match(/^cart:add:(\d+)$/);
+    const productId = match ? Number(match[1]) : 0;
+    if (productId === null) {
+      await this.messageController.reply(ctx, 'Продукта не существует', {}, true)
+    }
+    const userId = this.messageController.getUserId(ctx)
+    if (userId === null) {
+      await this.messageController.reply(ctx, 'Произошла ошибка', {}, true)
+      return
+    }
+    const cart: Cart | null = await this.repository.getCart(userId)
+    if (cart === null) {
+      await this.messageController.reply(ctx, 'Произошла ошибка', {}, true)
+      return
+    }
 
+    const productCart: ProductCart = {id: productId, qty: 1};
+    cart.products[productCart.id] = productCart;
+
+    await this.repository.saveCart(userId, cart)
+
+    const response = this.view.renderProductAddedMessage(ctx, productId);
+    await this.messageController.reply(ctx, response.text, { reply_markup: response.reply_markup });
+
+  }
 }

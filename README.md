@@ -27,6 +27,7 @@ Before running the bot, make sure you have the following environment variables s
 ```dotenv
 NODE_ENV=production
 POSTGRESQL_DSN=postgres://postgres:postgres@postgres:5432/postgres
+REDIS_DSN=redis://redis:6379/1
 WEBHOOK_URL=https://example.com/webhook
 BOT_TOKEN=your_telegram_bot_token
 ```
@@ -40,9 +41,9 @@ To run the bot locally, follow these steps:
 ```shell
 make setup
 ```
-2. Start the database:
+2. Start dependencies:
 ```shell
-make db/up
+make deps/up
 ```
 3. Apply database migrations:
 ```shell
@@ -62,9 +63,9 @@ To run the bot in Docker containers, follow these steps:
 ```shell
 make docker/build
 ```
-2. Start the database:
+2. Start dependencies:
 ```shell
-make db/up
+make deps/up
 ```
 3. Apply database migrations:
 ```shell
@@ -81,18 +82,25 @@ make docker/up
 ## **Makefile Commands**
 The project includes a `Makefile` for easier management. Below are the available commands:
 
-| Command                  | Description                              |
-|--------------------------|------------------------------------------|
-| `make setup`             | Install dependencies                    |
-| `make local/up`          | Run the bot locally                     |
-| `make docker/build`      | Build the Docker image                  |
-| `make docker/up`         | Start the bot container                 |
-| `make docker/down`       | Stop all containers                     |
-| `make db/up`             | Start the PostgreSQL database           |
-| `make db/down`           | Stop the PostgreSQL database            |
-| `make db/migrations/up`  | Apply database migrations               |
-| `make db/migrations/down`| Rollback database migrations            |
-| `make lint`              | Run ESLint                              |
+| Command                   | Description                   |
+|---------------------------|-------------------------------|
+| `make setup`              | Install dependencies          |
+| `make local/up`           | Run the bot locally           |
+| `make docker/build`       | Build the Docker image        |
+| `make docker/up`          | Start the bot container       |
+| `make docker/down`        | Stop all containers           |
+| `make db/up`              | Start the PostgreSQL database |
+| `make db/down`            | Stop the PostgreSQL database  |
+| `make db/migrations/up`   | Apply database migrations     |
+| `make db/migrations/down` | Rollback database migrations  |
+| `make db/samples/up`      | Apply test sample data        |
+| `make db/samples/down`    | Rollback test sample data     |
+| `make redis/up`           | Start the redis database      |
+| `make redis/down`         | Stop the redis database       |
+| `make redis/сдш`          | Start redis cli               |
+| `make deps/up`            | Start all dependencies        |
+| `make deps/down`          | Down all dependencies         |
+| `make lint`               | Run ESLint                    |
 
 ---
 

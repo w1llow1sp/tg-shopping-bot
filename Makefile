@@ -4,7 +4,10 @@ export
 .PHONY: setup \
 	local/up \
 	docker/build docker/up docker/down \
+	deps/up \
+	deps/down \
 	db/up db/down db/migrations/up db/migrations/down \
+	redis/up redis/down redis/cli\
 	lint \
 	utils/tuna/up
 
@@ -46,6 +49,35 @@ db/migrations/up:
 
 db/migrations/down:
 	$(DBMATE_CMD) ${dbmate-args} down
+
+redis/up:
+	$(DC_CMD) up redis -d
+
+redis/down:
+	$(DC_CMD) down redis
+
+redis/cli:
+	$(DC_CMD) exec -it redis redis-cli
+
+
+deps/up: db/up redis/up
+deps/down: db/down redis/down
+
+db/samples/up:
+	$(DBMATE_CMD) \
+		--url=${POSTGRESQL_DSN}?sslmode=disable \
+		--migrations-dir=./db/samples \
+		--no-dump-schema \
+		--wait \
+		up
+
+db/samples/down:
+	$(DBMATE_CMD) \
+		--url=${POSTGRESQL_DSN}?sslmode=disable \
+		--migrations-dir=./db/samples \
+		--no-dump-schema \
+		--wait \
+		down
 
 .db/rm:
 	$(DC_CMD) down postgres -v
