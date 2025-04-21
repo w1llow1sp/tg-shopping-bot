@@ -1,6 +1,10 @@
 import { InlineKeyboard } from 'grammy';
 
-
+// Интерфейс для ответа, согласованный с MenuController
+export interface Response {
+  text: string;
+  reply_markup?: InlineKeyboard;
+}
 
 export class MenuView {
   /**
@@ -8,8 +12,7 @@ export class MenuView {
    * @param username - Имя пользователя.
    * @returns Объект с текстом сообщения и клавиатурой.
    */
-
-  renderWelcomeMessage(username: string) {
+  renderWelcomeMessage(username: string): Response {
     const text = `Добро пожаловать в наш магазин, ${username}! Выберите действие:`;
     const reply_markup = new InlineKeyboard()
       .text('Каталог', 'catalog')
@@ -21,42 +24,23 @@ export class MenuView {
   }
 
   /**
-   * Формирует сообщение для каталога.
-   * @returns Текст сообщения.
-   */
-
-
-  /**
-   * Формирует сообщение для корзины.
-   * @returns Текст сообщения.
-   */
-  renderCartMessage(): string {
-    return 'Ваша корзина пуста!!!';
-  }
-
-  /**
-   * Формирует сообщение для заказов.
-   * @returns Текст сообщения.
-   */
-  renderOrderMessage(): string {
-    return 'У вас пока нет заказов.';
-  }
-
-  /**
    * Формирует сообщение для неизвестной команды.
-   * @returns Текст сообщения.
+   * @returns Объект с текстом сообщения и клавиатурой.
    */
-  renderUnknownCommandMessage(): string {
-    return 'Неизвестная команда.';
+  renderUnknownCommandMessage(): Response {
+    const text = 'Неизвестная команда.';
+    const reply_markup = new InlineKeyboard()
+      .text('Вернуться в меню', 'main');
+    return { text, reply_markup };
   }
 
   /**
    * Формирует сообщение об ошибке.
-   * @returns Текст сообщения.
+   * @returns Объект с текстом сообщения.
    */
-  renderErrorMessage(): string {
-    return 'Произошла ошибка. Попробуйте позже.';
+  renderErrorMessage(): Response {
+    const text = 'Произошла ошибка. Попробуйте позже.';
+    // Без клавиатуры, так как это сообщение об ошибке
+    return { text };
   }
-
-
 }

@@ -22,4 +22,5 @@ app.listen(PORT, async () => {
   } catch (error) {
     console.error('Error during initialization:', error);
   }
+  console.log("After try");
 });

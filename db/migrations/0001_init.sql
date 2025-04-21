@@ -1,4 +1,7 @@
 -- migrate:up
+-- CREATE database IF NOT EXISTS shopdb
+--                      WITH owner postgres
+
 CREATE TABLE IF NOT EXISTS catalog (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,

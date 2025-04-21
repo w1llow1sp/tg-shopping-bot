@@ -3,14 +3,14 @@ import { CatalogModel } from './model';
 import { CatalogView } from './view';
 import { Pool } from 'pg';
 
-export class CatalogController {
+export class CatalogService {
   private bot: Bot;
   private model: CatalogModel;
   private view: CatalogView;
   private productsPerPage: number;
 
   constructor(bot: Bot, db: Pool, productsPerPage: number = 4) {
-    console.log('CatalogController initialized with productsPerPage:', productsPerPage);
+    console.log('CatalogService initialized with productsPerPage:', productsPerPage);
     this.bot = bot;
     this.model = new CatalogModel();
     this.view = new CatalogView(productsPerPage);
@@ -19,11 +19,11 @@ export class CatalogController {
 
   async handleCallback(ctx: Context) {
     if (!ctx.callbackQuery) {
-      console.error('Callback query is undefined in CatalogController');
+      console.error('Callback query is undefined in CatalogService');
       return;
     }
     const callbackData = ctx.callbackQuery.data;
-    console.log('CatalogController processing callback:', callbackData);
+    console.log('CatalogService processing callback:', callbackData);
 
     try {
       if (callbackData === 'catalog') {

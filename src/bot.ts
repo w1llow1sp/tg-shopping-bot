@@ -1,8 +1,7 @@
 import { Bot } from 'grammy';
 import { env } from './consts';
-import { MenuController } from './services/menu/service';
+import { MenuService } from './services/menu/service';
 import { pool } from './db/db';
-import { CatalogController } from './services/catalog/controller';
 
 
 if (!env.BOT_TOKEN || !env.WEBHOOK_URL) {
@@ -15,9 +14,8 @@ export const bot = new Bot(env.BOT_TOKEN);
 
 // Инициализация контроллеров
 console.log('Initializing MenuController');
-const menuController = new MenuController(bot, pool);
-console.log('Initializing CatalogController');
-const catalogController = new CatalogController(bot, pool, 4);
+const menuService = new MenuService(bot, pool);
+
 
 bot.on('callback_query:data', async (ctx) => {
   if (!ctx.callbackQuery) {
@@ -28,13 +26,9 @@ bot.on('callback_query:data', async (ctx) => {
   console.log('Global callback received:', callbackData);
 
   try {
-    if (callbackData === 'catalog' || callbackData.startsWith('catalog_') || callbackData.startsWith('product_')) {
-      console.log('Delegating to CatalogController');
-      await catalogController.handleCallback(ctx);
-    } else {
-      console.log('Delegating to MenuController');
-      await menuController.handleCallback(ctx);
-    }
+    console.log('Delegating to MenuController');
+    await menuService.handleCallback(ctx);
+
     await ctx.answerCallbackQuery();
   } catch (error) {
     console.error('Error processing callback:', error);
