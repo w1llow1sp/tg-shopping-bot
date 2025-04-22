@@ -25,4 +25,14 @@ export class MenuRepository {
       throw error; // Пробрасываем ошибку дальше
     }
   }
+
+  async checkDbConnection(): Promise<string> {
+    try {
+      const result = await this.pool.query('SELECT version();');
+      return result.rows[0].version;
+    } catch (error) {
+      console.error('Ошибка проверки подключения к базе данных:', error);
+      throw error;
+    }
+  }
 }

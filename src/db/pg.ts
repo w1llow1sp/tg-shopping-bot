@@ -12,10 +12,10 @@ pool.on('error', (err) => {
 export async function initializePool(): Promise<void> {
     try {
         await pool.query('SELECT 1');
-        console.log('Пул соединений успешно инициализирован.');
+        console.log('Postgres pool established!');
     } catch (err) {
-        console.error('Ошибка инициализации пула соединений:', err);
-        process.exit(-1); // Завершаем процесс при ошибке подключения
+        console.error('Postgres pool error', err);
+        process.exit(-1);
     }
 }
 

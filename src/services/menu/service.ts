@@ -1,79 +1,77 @@
-import { Bot } from 'grammy';
-import { Pool } from 'pg';
+import { Bot, Context, InlineKeyboard } from 'grammy';
+import { MenuRepository } from './repository';
+import { MenuView } from './view';
+import { CallbackDataRoutes } from '../../consts';
+import { MessageController } from '../../message';
 
+
+// Интерфейс для ответа бота (текст и разметка кнопок)
+export interface Response {
+  text: string;
+  reply_markup?: InlineKeyboard;
+}
+
+// Интерфейс для информации о пользователе
+interface UserInfo {
+  username: string;
+  firstName?: string;
+}
+
+// Контроллер основного меню бота
 export class MenuService {
-  private bot: Bot;
-  private db: Pool;
+  // Зависимости: бот, репозиторий, вью и контроллер каталога
+  private readonly bot: Bot;
+  private readonly repository: MenuRepository;
+  private readonly view: MenuView;
+  private messageController: MessageController;
 
-  /**
-   * Конструктор класса MenuService.
-   * @param bot - Экземпляр бота grammy.
-   * @param db - Экземпляр пула соединений PostgreSQL.
-   */
-  constructor(bot: Bot, db: Pool) {
+
+  // Инициализация зависимостей
+  constructor(bot: Bot, repository: MenuRepository, messageController: MessageController) {
     this.bot = bot;
-    this.db = db;
-
-    // Регистрируем обработчики
-    this.registerMenu();
+    this.repository = repository;
+    this.messageController = messageController;
+    this.view = new MenuView();
+    this.registerHandlers();
   }
 
-  /**
-   * Регистрация команды /start и обработчиков кнопок меню.
-   */
-  private registerMenu() {
-    // Обработчик команды /start
-    this.bot.command('start', async (ctx) => {
-      try {
-        // Выполняем запрос к базе данных
-        const dbVersion = await this.db.query('SELECT version();');
-        console.log('Версия базы данных:', dbVersion.rows[0]);
-
-        // Получаем имя пользователя
-        const username = ctx.from?.username
-          ? `@${ctx.from.username}`
-          : ctx.from?.first_name || 'пользователь';
-
-        // Отправляем приветственное сообщение с кнопками
-        await ctx.reply(
-          `Добро пожаловать в наш магазин, ${username}! Для взаимодействия нажмите следующие кнопки:`,
-          {
-            reply_markup: {
-              inline_keyboard: [
-                [{ text: 'Каталог', callback_data: 'catalog' }],
-                [{ text: 'Корзина', callback_data: 'cart' }],
-                [{ text: 'Заказы', callback_data: 'order' }],
-              ],
-            },
-          },
-        );
-      } catch (error) {
-        console.error('Ошибка обработки команды /start:', error);
-        await ctx.reply('Произошла ошибка. Попробуйте позже.');
-      }
-    });
-
-    // Обработчик нажатий на кнопки меню
-    this.bot.on('callback_query:data', async (ctx) => {
-      const callbackData = ctx.callbackQuery.data;
-      console.log('Нажата кнопка:', callbackData);
-
-      switch (callbackData) {
-        case 'catalog':
-          await ctx.reply('Вы открыли каталог товаров.');
-          break;
-        case 'cart':
-          await ctx.reply('Ваша корзина пуста.');
-          break;
-        case 'order':
-          await ctx.reply('У вас пока нет заказов.');
-          break;
-        default:
-          await ctx.reply('Неизвестная команда.');
-      }
-
-      // Закрываем уведомление о нажатии кнопки
-      await ctx.answerCallbackQuery();
-    });
+  // Регистрация обработчиков команд и callback-запросов
+  private registerHandlers(): void {
+    this.bot.command('start', this.handleMenuCommand.bind(this));
+    this.bot.callbackQuery(CallbackDataRoutes.main, this.handleMenuCommand.bind(this));
   }
+
+  // Обработка команды /start
+  private async handleMenuCommand(ctx: Context): Promise<void> {
+    try {
+      // Получение имени пользователя
+      const userInfo = this.getUserInfo(ctx);
+      // Генерация приветственного сообщения
+      const response = this.view.renderWelcomeMessage(userInfo.username);
+
+      console.log(
+        'Sending welcome message:',
+        JSON.stringify(response, null, 2),
+      );
+      // Отправка ответа пользователю
+      await this.messageController.reply(ctx, response.text, { reply_markup: response.reply_markup })
+    } catch (error) {
+      // Обработка ошибок при выполнении команды
+      console.error('Error handling /start command:', error);
+      const errorResponse = this.view.renderErrorMessage();
+      // Исправлено: передаем errorResponse.text и errorResponse.reply_markup
+      await ctx.reply(errorResponse.text, {
+        reply_markup: errorResponse.reply_markup,
+      });
+    }
+  }
+
+  // Извлечение информации о пользователе из контекста
+  private getUserInfo(ctx: Context): UserInfo {
+    const username = ctx.from?.username
+      ? `@${ctx.from.username}`
+      : ctx.from?.first_name || 'user';
+    return { username, firstName: ctx.from?.first_name };
+  }
+
 }
