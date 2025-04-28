@@ -1,6 +1,6 @@
 import { Bot, Context } from 'grammy';
-import { OrderModel } from './models';
-import { OrderView } from './view';
+import { OrderModel } from './order.models';
+import { OrderView } from './order.view';
 import { Pool } from 'pg';
 
 export class OrderService {

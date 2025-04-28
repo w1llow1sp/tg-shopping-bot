@@ -1,5 +1,5 @@
 import { InlineKeyboard } from 'grammy';
-import { Response } from '../menu/view';
+import { Response } from '../menu/menu.view';
 
 export class OrderView {
 

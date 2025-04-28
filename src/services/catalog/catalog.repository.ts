@@ -6,6 +6,7 @@ export interface Product {
   description: string;
   price: number;
   image: string;
+  itemsavailable: number;
 }
 
 export class CatalogRepository {
@@ -16,10 +17,10 @@ export class CatalogRepository {
   }
 
   async getProducts(limit: number, offset: number): Promise<Product[]> {
-    const sql = 'SELECT id, name, description, price, image FROM catalog ORDER BY id LIMIT $1 OFFSET $2';
+    const sql = 'SELECT id, name, description, price, image, itemsavailable FROM catalog ORDER BY id LIMIT $1 OFFSET $2';
     try {
       const products = await this.pool.query<Product>(sql, [limit, offset]);
-      console.log('Successfully fetched products from catalog:', products);
+      console.log('Successfully fetched products from catalog:', products.rows);
       return products.rows;
     } catch (error) {
       console.error('Ошибка в getProducts:', error);
@@ -41,15 +42,17 @@ export class CatalogRepository {
   }
 
   async getProductDetail(productId: number): Promise<Product> {
-    const sql = 'SELECT id, name, description, price, image FROM catalog WHERE id = $1';
+    const sql = 'SELECT id, name, description, price, image, itemsavailable FROM catalog WHERE id = $1';
     try {
       const products = await this.pool.query<Product>(sql, [productId]);
-      console.log('Successfully fetched products from catalog:', products);
+      console.log('Successfully fetched product detail:', products.rows[0]);
+      if (products.rows.length === 0) {
+        throw new Error(`Product with ID ${productId} not found`);
+      }
       return products.rows[0];
     } catch (error) {
-      console.error('Ошибка в getProducts:', error);
-      throw new Error('Failed to fetch products from catalog');
+      console.error('Ошибка в getProductDetail:', error);
+      throw error;
     }
-
   }
 }
