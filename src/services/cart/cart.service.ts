@@ -114,6 +114,72 @@ export class CartService {
     }
 
     try {
+      const product = await this.catalogRepository.getProductDetail(productId);
+      const cart = await this.repository.getCart(userId);
+
+      if (cart.products[productId]) {
+        if (cart.products[productId].qty >= this.MAX_QUANTITY) {
+          await ctx.answerCallbackQuery({
+            text: `Максимум ${this.MAX_QUANTITY} единиц одного товара`,
+            show_alert: true,
+          });
+          return;
+        }
+        cart.products[productId].qty += 1;
+      } else {
+        cart.products[productId] = { id: productId, qty: 1 };
+      }
+
+      cart.total = await this.calculateTotal(cart);
+      await this.repository.saveCart(userId, cart);
+
+      // Показываем всплывающее уведомление
+      await ctx.answerCallbackQuery({
+        text: `Товар ${this.escapeMarkdown(product.name)} добавлен в корзину!`,
+        show_alert: false,
+      });
+    } catch (error) {
+      console.error('Ошибка в handleAddProduct:', error);
+      const message =
+        error instanceof Error && error.message.includes('Product with ID')
+          ? 'Продукт не найден'
+          : 'Произошла ошибка при добавлении в корзину';
+      await ctx.answerCallbackQuery({ text: message, show_alert: true });
+    }
+  }
+
+// Функция для экранирования MarkdownV2
+  private escapeMarkdown(text: string): string {
+    return text.replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
+  }
+
+/*
+  async handleAddProduct(ctx: Context): Promise<void> {
+    if (!this.messageController) {
+      console.error('handleAddProduct: messageController is undefined', { ctxUpdate: ctx.update });
+      await ctx.reply('Произошла ошибка: сервис сообщений недоступен', {});
+      await ctx.answerCallbackQuery();
+      return;
+    }
+
+    const callbackData = ctx.callbackQuery?.data;
+    if (!callbackData) {
+      await this.messageController.reply(ctx, 'Произошла ошибка', {}, true);
+      await ctx.answerCallbackQuery();
+      return;
+    }
+
+    const match = callbackData.match(/^cart:add:(\d+)$/);
+    const productId = match ? Number(match[1]) : 0;
+    const userId = this.messageController.getUserId(ctx);
+
+    if (!userId || !productId) {
+      await this.messageController.reply(ctx, 'Произошла ошибка', {}, true);
+      await ctx.answerCallbackQuery();
+      return;
+    }
+
+    try {
       await this.catalogRepository.getProductDetail(productId);
 
       const cart = await this.repository.getCart(userId);
@@ -156,6 +222,7 @@ export class CartService {
       await ctx.answerCallbackQuery();
     }
   }
+  */
 
   async handleDeleteProduct(ctx: Context): Promise<void> {
     if (!this.messageController) {
