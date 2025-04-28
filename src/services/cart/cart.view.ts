@@ -65,7 +65,7 @@ export class CartView {
 
     const productName = this.escapeMarkdown(product.name);
     return {
-      text: `✅ ${productName} добавлен в корзину!`,
+      text: `✅ ${productName} добавлен в корзину\\!`,
       reply_markup: keyboard,
     };
   }

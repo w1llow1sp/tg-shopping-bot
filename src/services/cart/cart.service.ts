@@ -145,7 +145,8 @@ export class CartService {
         parse_mode: 'MarkdownV2',
       }, true); // addNavigationButtons = true
       await ctx.answerCallbackQuery();
-    } catch (error) {
+    }
+    catch (error) {
       console.error('Ошибка в handleAddProduct:', error);
       const message =
         error instanceof Error && error.message.includes('Product with ID')
