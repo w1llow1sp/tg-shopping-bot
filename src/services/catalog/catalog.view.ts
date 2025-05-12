@@ -13,9 +13,14 @@ export class CatalogView {
     this.productsPerPage = productsPerPage;
   }
 
-  private escapeMarkdown(text: string): string {
-    // Экранируем все специальные символы для MarkdownV2, включая точку
-    return text.replace(/([_*[\]()~`>#+\-=|{}.!])/g, '\\$1');
+  private escapeHTML(text: string): string {
+    // Экранируем специальные символы для HTML, включая дополнительные случаи
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 
   renderCatalog(
@@ -23,18 +28,18 @@ export class CatalogView {
     currentPage: number,
     totalProducts: number,
   ): CatalogResponse {
-    const pageText = this.escapeMarkdown(`страница ${currentPage + 1}`);
+    const pageText = this.escapeHTML(`страница ${currentPage + 1}`);
     const text = products.length
-      ? `🥦 Каталог товаров \\(${pageText}\\):`
-      : 'Каталог пуст \\:(';
+      ? `<b>🥦 Каталог товаров (${pageText}):</b>`
+      : 'Каталог пуст :(';
 
     const keyboard = new InlineKeyboard();
 
     products.forEach((product) => {
-      const productName = this.escapeMarkdown(product.name);
+      const productName = this.escapeHTML(product.name);
       keyboard
         .text(
-          `${productName} \(${this.escapeMarkdown(product.price.toString())} ₽\)`,
+          `${productName} (${this.escapeHTML(product.price.toString())} ₽)`,
           `${CallbackDataRoutes.product}:${product.id}`,
         )
         .row();
@@ -92,20 +97,24 @@ export class CatalogView {
     const backCallbackValue = backCallback || `${CallbackDataRoutes.catalog}:0`;
     keyboard.text('<< 🥦 Назад', backCallbackValue).row();
 
-    const name = this.escapeMarkdown(product.name);
-    const description = this.escapeMarkdown(product.description || 'Нет описания');
-    const price = this.escapeMarkdown(product.price.toString());
-    const itemsavailable = this.escapeMarkdown(product.itemsavailable.toString());
+    const name = this.escapeHTML(product.name || '');
+    const description = this.escapeHTML(product.description || 'Нет описания');
+    const price = this.escapeHTML(product.price?.toString() || '0');
+    const itemsavailable = this.escapeHTML(product.itemsavailable?.toString() || '0');
 
-    const caption = `**${name}**\n\n` +
-      `**Описание:**\n${description}\n\n` +
-      `**Цена:** ${price} ₽\n` +
-      `**Доступное количество:** ${itemsavailable}`;
+    const caption = `<b>${name}</b>\n\n` +
+      `<b>Описание:</b>\n${description}\n\n` +
+      `<b>Цена:</b> ${price} ₽\n` +
+      `<b>Доступное количество:</b> ${itemsavailable}`;
 
-    // Логируем текст для диагностики
+    // Логируем текст и его длину для диагностики
     console.log('Product caption/text:', caption);
+    console.log('Caption length (bytes):', Buffer.byteLength(caption, 'utf8'));
 
-    if (product.image && product.image.startsWith('http')) {
+    // Проверяем, является ли URL изображения валидным
+    const isValidImageUrl = product.image && /^https?:\/\/.*\.(jpg|jpeg|png|gif)$/i.test(product.image);
+
+    if (isValidImageUrl) {
       return {
         photo: product.image,
         caption,
@@ -113,6 +122,7 @@ export class CatalogView {
       };
     }
 
+    console.warn('Invalid or missing image URL, rendering text-only:', product.image);
     return {
       text: caption,
       reply_markup: keyboard,

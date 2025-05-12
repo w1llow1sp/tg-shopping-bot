@@ -58,7 +58,7 @@ export class CatalogService {
       const textResponse = response as { text: string; reply_markup: InlineKeyboard };
       await this.messageController.reply(ctx, textResponse.text, {
         reply_markup: textResponse.reply_markup,
-        parse_mode: 'HTML', // Временно используем HTML
+        parse_mode: 'HTML',
       });
     } catch (error) {
       console.error('Ошибка в showCatalog:', error);
@@ -112,7 +112,7 @@ export class CatalogService {
                 type: 'photo',
                 media: response.photo,
                 caption: response.caption,
-                parse_mode: 'HTML', // Временно используем HTML
+                parse_mode: 'HTML',
               },
               { reply_markup: response.reply_markup },
             );
@@ -120,18 +120,38 @@ export class CatalogService {
             console.log('Editing text message');
             await ctx.editMessageText(response.text, {
               reply_markup: response.reply_markup,
-              parse_mode: 'HTML', // Временно используем HTML
+              parse_mode: 'HTML',
             });
           }
         } catch (editError) {
-          console.warn('Failed to edit message, sending new one:', editError);
+          console.warn('Failed to edit message:', editError);
+          try {
+            // Пытаемся удалить старое сообщение
+            await ctx.deleteMessage();
+          } catch (deleteError) {
+            console.warn('Failed to delete message:', deleteError);
+          }
+          // Отправляем новое сообщение
           if ('photo' in response) {
             console.log('Sending new photo response');
-            await ctx.replyWithPhoto(response.photo, {
-              caption: response.caption,
-              reply_markup: response.reply_markup,
-              parse_mode: 'HTML', // Временно используем HTML
-            });
+            try {
+              await ctx.replyWithPhoto(response.photo, {
+                caption: response.caption,
+                reply_markup: response.reply_markup,
+                // parse_mode: 'HTML', // Временно отключаем parse_mode
+              });
+            } catch (photoError) {
+              console.warn('Failed to send photo, sending text-only:', photoError);
+              await this.messageController.reply(
+                ctx,
+                response.caption, // Используем caption как текст
+                {
+                  reply_markup: response.reply_markup,
+                  parse_mode: 'HTML',
+                },
+                true,
+              );
+            }
           } else {
             console.log('Sending new text response');
             await this.messageController.reply(
@@ -139,7 +159,7 @@ export class CatalogService {
               response.text,
               {
                 reply_markup: response.reply_markup,
-                parse_mode: 'HTML', // Временно используем HTML
+                parse_mode: 'HTML',
               },
               true,
             );
@@ -149,11 +169,24 @@ export class CatalogService {
         // Если редактировать нечего, отправляем новое сообщение
         if ('photo' in response) {
           console.log('Sending new photo response');
-          await ctx.replyWithPhoto(response.photo, {
-            caption: response.caption,
-            reply_markup: response.reply_markup,
-            parse_mode: 'HTML', // Временно используем HTML
-          });
+          try {
+            await ctx.replyWithPhoto(response.photo, {
+              caption: response.caption,
+              reply_markup: response.reply_markup,
+              // parse_mode: 'HTML', // Временно отключаем parse_mode
+            });
+          } catch (photoError) {
+            console.warn('Failed to send photo, sending text-only:', photoError);
+            await this.messageController.reply(
+              ctx,
+              response.caption, // Используем caption как текст
+              {
+                reply_markup: response.reply_markup,
+                parse_mode: 'HTML',
+              },
+              true,
+            );
+          }
         } else {
           console.log('Sending new text response');
           await this.messageController.reply(
@@ -161,7 +194,7 @@ export class CatalogService {
             response.text,
             {
               reply_markup: response.reply_markup,
-              parse_mode: 'HTML', // Временно используем HTML
+              parse_mode: 'HTML',
             },
             true,
           );
