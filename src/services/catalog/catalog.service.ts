@@ -1,4 +1,4 @@
-import { Bot, Context, InlineKeyboard } from 'grammy';
+import { Bot, Context, InlineKeyboard, InputFile } from 'grammy';
 import { CatalogRepository } from './catalog.repository';
 import { CatalogView } from './catalog.view';
 import { CallbackDataRoutes } from '../../consts';
@@ -41,11 +41,8 @@ export class CatalogService {
     await this.messageController.savePreviousCallbackData(ctx);
     const match = ctx.callbackQuery?.data?.match(/^catalog:(\d+)$/);
     const page = match ? Number(match[1]) : 0;
-    await this.showCatalog(ctx, page);
-  }
 
-  private async showCatalog(ctx: Context, page: number) {
-    console.log('Showing catalog for page:', page);
+    console.log('Handling catalog for page:', page);
     const offset = page * this.productsPerPage;
     try {
       const [products, totalProducts] = await Promise.all([
@@ -56,14 +53,43 @@ export class CatalogService {
       const response = this.view.renderCatalog(products, page, totalProducts);
       console.log('Catalog response:', JSON.stringify(response, null, 2));
       const textResponse = response as { text: string; reply_markup: InlineKeyboard };
-      await this.messageController.reply(ctx, textResponse.text, {
-        reply_markup: textResponse.reply_markup,
-        parse_mode: 'HTML',
-      });
+
+      // Проверяем, можно ли редактировать текущее сообщение
+      const message = ctx.callbackQuery?.message;
+      if (message) {
+        try {
+          console.log('Editing catalog message');
+          await ctx.editMessageText(textResponse.text, {
+            reply_markup: textResponse.reply_markup,
+            parse_mode: 'HTML',
+          });
+        } catch (editError) {
+          console.warn('Failed to edit catalog message, sending new one:', editError);
+          try {
+            // Пытаемся удалить старое сообщение
+            await ctx.deleteMessage();
+          } catch (deleteError) {
+            console.warn('Failed to delete message:', deleteError);
+          }
+          // Отправляем новое сообщение
+          await this.messageController.reply(ctx, textResponse.text, {
+            reply_markup: textResponse.reply_markup,
+            parse_mode: 'HTML',
+          });
+        }
+      } else {
+        console.log('No message to edit, sending new catalog response');
+        await this.messageController.reply(ctx, textResponse.text, {
+          reply_markup: textResponse.reply_markup,
+          parse_mode: 'HTML',
+        });
+      }
+
+      await ctx.answerCallbackQuery();
     } catch (error) {
-      console.error('Ошибка в showCatalog:', error);
+      console.error('Ошибка в handleCatalog:', error);
       await ctx.reply(this.view.renderErrorMessage(), { parse_mode: 'HTML' });
-      throw error;
+      await ctx.answerCallbackQuery();
     }
   }
 
@@ -138,13 +164,13 @@ export class CatalogService {
               await ctx.replyWithPhoto(response.photo, {
                 caption: response.caption,
                 reply_markup: response.reply_markup,
-                // parse_mode: 'HTML', // Временно отключаем parse_mode
+                parse_mode: 'HTML',
               });
             } catch (photoError) {
               console.warn('Failed to send photo, sending text-only:', photoError);
               await this.messageController.reply(
                 ctx,
-                response.caption, // Используем caption как текст
+                response.caption,
                 {
                   reply_markup: response.reply_markup,
                   parse_mode: 'HTML',
@@ -173,13 +199,13 @@ export class CatalogService {
             await ctx.replyWithPhoto(response.photo, {
               caption: response.caption,
               reply_markup: response.reply_markup,
-              // parse_mode: 'HTML', // Временно отключаем parse_mode
+              parse_mode: 'HTML',
             });
           } catch (photoError) {
             console.warn('Failed to send photo, sending text-only:', photoError);
             await this.messageController.reply(
               ctx,
-              response.caption, // Используем caption как текст
+              response.caption,
               {
                 reply_markup: response.reply_markup,
                 parse_mode: 'HTML',
