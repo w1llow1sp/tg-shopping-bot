@@ -1,4 +1,4 @@
-import { Bot, Context } from 'grammy';
+import { Bot, Context, InlineKeyboard } from 'grammy';
 import { CatalogRepository } from '../catalog/catalog.repository';
 import { CartView } from './cart.view';
 import { CallbackDataRoutes } from '../../consts';
@@ -76,13 +76,13 @@ export class CartService {
       console.log('Render cart response:', response);
       await this.messageController.reply(ctx, response.text, {
         reply_markup: response.reply_markup,
-        parse_mode: 'MarkdownV2',
+        parse_mode: 'HTML', // Временно используем HTML
       }, true); // addNavigationButtons = true
       await ctx.answerCallbackQuery();
     } catch (error) {
       console.error('Ошибка в handleCart:', error);
       await this.messageController.reply(ctx, 'Произошла ошибка при открытии корзины.', {
-        parse_mode: 'MarkdownV2',
+        parse_mode: 'HTML', // Временно используем HTML
       }, true);
       await ctx.answerCallbackQuery();
     }
@@ -111,6 +111,13 @@ export class CartService {
       await this.messageController.reply(ctx, 'Произошла ошибка', {}, true);
       await ctx.answerCallbackQuery();
       return;
+    }
+
+    // Отвечаем на callback как можно раньше
+    try {
+      await ctx.answerCallbackQuery();
+    } catch (callbackError) {
+      console.warn('Failed to answer callback query:', callbackError);
     }
 
     try {
@@ -144,85 +151,13 @@ export class CartService {
         error instanceof Error && error.message.includes('Product with ID')
           ? 'Продукт не найден'
           : 'Произошла ошибка при добавлении в корзину';
-      await ctx.answerCallbackQuery({ text: message, show_alert: true });
-    }
-  }
-
-// Функция для экранирования MarkdownV2
-  private escapeMarkdown(text: string): string {
-    return text.replace(/[_*[\]()~`>#+\-=|{}.!]/g, '\\$&');
-  }
-
-/*
-  async handleAddProduct(ctx: Context): Promise<void> {
-    if (!this.messageController) {
-      console.error('handleAddProduct: messageController is undefined', { ctxUpdate: ctx.update });
-      await ctx.reply('Произошла ошибка: сервис сообщений недоступен', {});
-      await ctx.answerCallbackQuery();
-      return;
-    }
-
-    const callbackData = ctx.callbackQuery?.data;
-    if (!callbackData) {
-      await this.messageController.reply(ctx, 'Произошла ошибка', {}, true);
-      await ctx.answerCallbackQuery();
-      return;
-    }
-
-    const match = callbackData.match(/^cart:add:(\d+)$/);
-    const productId = match ? Number(match[1]) : 0;
-    const userId = this.messageController.getUserId(ctx);
-
-    if (!userId || !productId) {
-      await this.messageController.reply(ctx, 'Произошла ошибка', {}, true);
-      await ctx.answerCallbackQuery();
-      return;
-    }
-
-    try {
-      await this.catalogRepository.getProductDetail(productId);
-
-      const cart = await this.repository.getCart(userId);
-
-      if (cart.products[productId]) {
-        if (cart.products[productId].qty >= this.MAX_QUANTITY) {
-          await this.messageController.reply(
-            ctx,
-            `Максимум ${this.MAX_QUANTITY} единиц одного товара`,
-            {},
-            true,
-          );
-          await ctx.answerCallbackQuery();
-          return;
-        }
-        cart.products[productId].qty += 1;
-      } else {
-        cart.products[productId] = { id: productId, qty: 1 };
+      try {
+        await ctx.answerCallbackQuery({ text: message, show_alert: true });
+      } catch (callbackError) {
+        console.warn('Failed to answer callback query on error:', callbackError);
       }
-
-      cart.total = await this.calculateTotal(cart);
-      await this.repository.saveCart(userId, cart);
-
-      const response = await this.view.renderProductAddedMessage(ctx, productId);
-      console.log('Render product added response:', response);
-
-      await this.messageController.reply(ctx, response.text, {
-        reply_markup: response.reply_markup,
-        parse_mode: 'MarkdownV2',
-      }, true); // addNavigationButtons = true
-      await ctx.answerCallbackQuery();
-    }
-    catch (error) {
-      console.error('Ошибка в handleAddProduct:', error);
-      const message =
-        error instanceof Error && error.message.includes('Product with ID')
-          ? 'Продукт не найден'
-          : 'Произошла ошибка при добавлении в корзину';
-      await this.messageController.reply(ctx, message, {}, true);
-      await ctx.answerCallbackQuery();
     }
   }
-  */
 
   async handleDeleteProduct(ctx: Context): Promise<void> {
     if (!this.messageController) {
@@ -266,13 +201,13 @@ export class CartService {
 
       await this.messageController.reply(ctx, response.text, {
         reply_markup: response.reply_markup,
-        parse_mode: 'MarkdownV2',
+        parse_mode: 'HTML', // Временно используем HTML
       }, true); // addNavigationButtons = true
       await ctx.answerCallbackQuery();
     } catch (error) {
       console.error('Ошибка в handleDeleteProduct:', error);
       await this.messageController.reply(ctx, 'Произошла ошибка при удалении из корзины.', {
-        parse_mode: 'MarkdownV2',
+        parse_mode: 'HTML', // Временно используем HTML
       }, true);
       await ctx.answerCallbackQuery();
     }
@@ -331,13 +266,13 @@ export class CartService {
 
       await this.messageController.reply(ctx, response.text, {
         reply_markup: response.reply_markup,
-        parse_mode: 'MarkdownV2',
+        parse_mode: 'HTML', // Временно используем HTML
       }, true); // addNavigationButtons = true
       await ctx.answerCallbackQuery();
     } catch (error) {
       console.error('Ошибка в handleIncreaseQty:', error);
       await this.messageController.reply(ctx, 'Произошла ошибка при изменении количества.', {
-        parse_mode: 'MarkdownV2',
+        parse_mode: 'HTML', // Временно используем HTML
       }, true);
       await ctx.answerCallbackQuery();
     }
@@ -389,13 +324,13 @@ export class CartService {
 
       await this.messageController.reply(ctx, response.text, {
         reply_markup: response.reply_markup,
-        parse_mode: 'MarkdownV2',
+        parse_mode: 'HTML', // Временно используем HTML
       }, true); // addNavigationButtons = true
       await ctx.answerCallbackQuery();
     } catch (error) {
       console.error('Ошибка в handleDecreaseQty:', error);
       await this.messageController.reply(ctx, 'Произошла ошибка при изменении количества.', {
-        parse_mode: 'MarkdownV2',
+        parse_mode: 'HTML', // Временно используем HTML
       }, true);
       await ctx.answerCallbackQuery();
     }
@@ -423,5 +358,9 @@ export class CartService {
     await this.redis.expire(cacheKey, this.PRICE_CACHE_TTL);
 
     return product.price;
+  }
+
+  private escapeMarkdown(text: string): string {
+    return text.replace(/([_*[\]()~`>#+\-=|{}.!])/g, '\\$1');
   }
 }

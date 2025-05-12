@@ -55,4 +55,29 @@ export class CatalogRepository {
       throw error;
     }
   }
+
+  async getNeighborProducts(productId: number): Promise<{ prevId: number | null; nextId: number | null }> {
+    try {
+      const [prevResult, nextResult] = await Promise.all([
+        // Находим предыдущий товар (меньший ID)
+        this.pool.query<{ id: number }>(
+          'SELECT id FROM catalog WHERE id < $1 ORDER BY id DESC LIMIT 1',
+          [productId],
+        ),
+        // Находим следующий товар (больший ID)
+        this.pool.query<{ id: number }>(
+          'SELECT id FROM catalog WHERE id > $1 ORDER BY id ASC LIMIT 1',
+          [productId],
+        ),
+      ]);
+
+      return {
+        prevId: prevResult.rows.length > 0 ? prevResult.rows[0].id : null,
+        nextId: nextResult.rows.length > 0 ? nextResult.rows[0].id : null,
+      };
+    } catch (error) {
+      console.error('Ошибка в getNeighborProducts:', error);
+      throw new Error('Failed to fetch neighbor products');
+    }
+  }
 }

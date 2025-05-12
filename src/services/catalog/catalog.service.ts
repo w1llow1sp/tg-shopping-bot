@@ -20,7 +20,10 @@ export class CatalogService {
     messageController: MessageController,
     productsPerPage: number = 4,
   ) {
-    console.log('CatalogService initialized with productsPerPage:', productsPerPage);
+    console.log(
+      'CatalogService initialized with productsPerPage:',
+      productsPerPage,
+    );
     this.bot = bot;
     this.repository = repository;
     this.view = new CatalogView(productsPerPage);
@@ -52,15 +55,14 @@ export class CatalogService {
       console.log('Products fetched:', products, 'Total:', totalProducts);
       const response = this.view.renderCatalog(products, page, totalProducts);
       console.log('Catalog response:', JSON.stringify(response, null, 2));
-      // Явно указываем, что response имеет тип { text, reply_markup }
       const textResponse = response as { text: string; reply_markup: InlineKeyboard };
       await this.messageController.reply(ctx, textResponse.text, {
         reply_markup: textResponse.reply_markup,
-        parse_mode: 'MarkdownV2',
+        parse_mode: 'HTML', // Временно используем HTML
       });
     } catch (error) {
       console.error('Ошибка в showCatalog:', error);
-      await ctx.reply(this.view.renderErrorMessage(), { parse_mode: 'MarkdownV2' });
+      await ctx.reply(this.view.renderErrorMessage(), { parse_mode: 'HTML' });
       throw error;
     }
   }
@@ -72,37 +74,98 @@ export class CatalogService {
       console.log('Handling product with ID:', productId);
       if (!productId) {
         console.log('Invalid product ID');
-        await ctx.reply('Неверный ID продукта.', { parse_mode: 'MarkdownV2' });
+        await ctx.reply('Неверный ID продукта.', { parse_mode: 'HTML' });
         await ctx.answerCallbackQuery();
         return;
       }
 
-      const product = await this.repository.getProductDetail(productId);
-      console.log('Fetched product:', product);
-      const response = this.view.renderProduct(product);
+      // Получаем продукт и соседние товары
+      const [product, neighbors] = await Promise.all([
+        this.repository.getProductDetail(productId),
+        this.repository.getNeighborProducts(productId),
+      ]);
+      console.log('Fetched product:', product, 'Neighbors:', neighbors);
+
+      // Получаем предыдущие данные для кнопки "Назад"
+      const prevCallback = await this.messageController.getPreviousCallbackData(ctx);
+      console.log('Previous callback data:', prevCallback);
+
+      // Преобразуем null в undefined
+      const backCallback: string | undefined = prevCallback ?? undefined;
+
+      const response = this.view.renderProduct(
+        product,
+        neighbors.prevId,
+        neighbors.nextId,
+        backCallback,
+      );
       console.log('Render product response:', response);
 
-      // Добавляем кнопку "Назад"
-      const prev = await this.messageController.getPreviousCallbackData(ctx);
-      console.log('Previous callback data:', prev);
-      if (prev != null) {
-        response.reply_markup.text('<< 🥦', prev).row();
-      }
-
-      // Отправляем ответ в зависимости от типа
-      if ('photo' in response) {
-        console.log('Sending photo response');
-        await ctx.replyWithPhoto(response.photo, {
-          caption: response.caption,
-          reply_markup: response.reply_markup,
-          parse_mode: 'MarkdownV2',
-        });
+      // Проверяем, можно ли редактировать сообщение
+      const message = ctx.callbackQuery?.message;
+      if (message) {
+        try {
+          if ('photo' in response) {
+            console.log('Editing photo message');
+            await ctx.editMessageMedia(
+              {
+                type: 'photo',
+                media: response.photo,
+                caption: response.caption,
+                parse_mode: 'HTML', // Временно используем HTML
+              },
+              { reply_markup: response.reply_markup },
+            );
+          } else {
+            console.log('Editing text message');
+            await ctx.editMessageText(response.text, {
+              reply_markup: response.reply_markup,
+              parse_mode: 'HTML', // Временно используем HTML
+            });
+          }
+        } catch (editError) {
+          console.warn('Failed to edit message, sending new one:', editError);
+          if ('photo' in response) {
+            console.log('Sending new photo response');
+            await ctx.replyWithPhoto(response.photo, {
+              caption: response.caption,
+              reply_markup: response.reply_markup,
+              parse_mode: 'HTML', // Временно используем HTML
+            });
+          } else {
+            console.log('Sending new text response');
+            await this.messageController.reply(
+              ctx,
+              response.text,
+              {
+                reply_markup: response.reply_markup,
+                parse_mode: 'HTML', // Временно используем HTML
+              },
+              true,
+            );
+          }
+        }
       } else {
-        console.log('Sending text response');
-        await this.messageController.reply(ctx, response.text, {
-          reply_markup: response.reply_markup,
-          parse_mode: 'MarkdownV2',
-        }, true);
+        // Если редактировать нечего, отправляем новое сообщение
+        if ('photo' in response) {
+          console.log('Sending new photo response');
+          await ctx.replyWithPhoto(response.photo, {
+            caption: response.caption,
+            reply_markup: response.reply_markup,
+            parse_mode: 'HTML', // Временно используем HTML
+          });
+        } else {
+          console.log('Sending new text response');
+          await this.messageController.reply(
+            ctx,
+            response.text,
+            {
+              reply_markup: response.reply_markup,
+              parse_mode: 'HTML', // Временно используем HTML
+            },
+            true,
+          );
+        }
       }
 
       // Удаляем предыдущие данные callback
@@ -110,7 +173,7 @@ export class CatalogService {
       await ctx.answerCallbackQuery();
     } catch (error) {
       console.error('Ошибка в handleProduct:', error);
-      await ctx.reply(this.view.renderErrorMessage(), { parse_mode: 'MarkdownV2' });
+      await ctx.reply(this.view.renderErrorMessage(), { parse_mode: 'HTML' });
       await ctx.answerCallbackQuery();
     }
   }

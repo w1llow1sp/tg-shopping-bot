@@ -36,7 +36,7 @@ VALUES (5,
         'Грунт Волшебная грядка для АЗАЛИЙ 3л',
         'Специальный грунт с ярко выраженной кислой реакцией рН с полным набором питательных элементов',
         85,
-        'https://greenisland.ru/upload/iblock/26d/26d0333848f8a61746a1cfa75b1c04ab.jpg',
+        'https://greenisland.ru/upload/resize_cache/iblock/4b2/340_340_140cd750bba9870f18aada2478b24840a/4b2bd8f91462095c456e40f0de41232f.jpg',
         8);
 INSERT INTO public.catalog (id, name, description, price, image, itemsavailable)
 VALUES (

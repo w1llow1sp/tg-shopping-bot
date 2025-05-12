@@ -1,4 +1,3 @@
-
 import { Product } from './catalog.repository';
 import { InlineKeyboard } from 'grammy';
 import { CallbackDataRoutes } from '../../consts';
@@ -15,6 +14,7 @@ export class CatalogView {
   }
 
   private escapeMarkdown(text: string): string {
+    // Экранируем все специальные символы для MarkdownV2, включая точку
     return text.replace(/([_*[\]()~`>#+\-=|{}.!])/g, '\\$1');
   }
 
@@ -30,24 +30,21 @@ export class CatalogView {
 
     const keyboard = new InlineKeyboard();
 
-    // Добавляем кнопки для продуктов с экранированием имени
     products.forEach((product) => {
       const productName = this.escapeMarkdown(product.name);
       keyboard
         .text(
-          `${productName} \(${product.price} ₽\)`,
+          `${productName} \(${this.escapeMarkdown(product.price.toString())} ₽\)`,
           `${CallbackDataRoutes.product}:${product.id}`,
         )
         .row();
     });
 
-    // Добавляем кнопки "Корзина" и "Главная"
     keyboard
       .text('Корзина', CallbackDataRoutes.cart)
       .text('Главная', CallbackDataRoutes.main)
       .row();
 
-    // Логика пагинации
     const totalPages = Math.ceil(totalProducts / this.productsPerPage);
     if (totalPages > 1) {
       if (currentPage === 0) {
@@ -64,18 +61,49 @@ export class CatalogView {
     return { text, reply_markup: keyboard };
   }
 
-  renderProduct(product: Product): CatalogResponse {
-    const keyboard = new InlineKeyboard()
+  renderProduct(
+    product: Product,
+    prevProductId: number | null = null,
+    nextProductId: number | null = null,
+    backCallback?: string,
+  ): CatalogResponse {
+    const keyboard = new InlineKeyboard();
+
+    // Навигационные кнопки "<<" и ">>"
+    if (prevProductId || nextProductId) {
+      keyboard
+        .text(
+          prevProductId ? '<<' : ' ',
+          prevProductId ? `${CallbackDataRoutes.product}:${prevProductId}` : 'noop',
+        )
+        .text(
+          nextProductId ? '>>' : ' ',
+          nextProductId ? `${CallbackDataRoutes.product}:${nextProductId}` : 'noop',
+        )
+        .row();
+    }
+
+    // Кнопка "Добавить в корзину"
+    keyboard
       .text('Добавить в корзину 🧺', `${CallbackDataRoutes.cart}:add:${product.id}`)
       .row();
 
+    // Кнопка "Назад" (всегда отображается)
+    const backCallbackValue = backCallback || `${CallbackDataRoutes.catalog}:0`;
+    keyboard.text('<< 🥦 Назад', backCallbackValue).row();
+
     const name = this.escapeMarkdown(product.name);
-    const description = this.escapeMarkdown(product.description);
+    const description = this.escapeMarkdown(product.description || 'Нет описания');
+    const price = this.escapeMarkdown(product.price.toString());
+    const itemsavailable = this.escapeMarkdown(product.itemsavailable.toString());
 
     const caption = `**${name}**\n\n` +
       `**Описание:**\n${description}\n\n` +
-      `**Цена:** ${product.price} ₽\n` +
-      `**Доступное количество:** ${product.itemsavailable}`;
+      `**Цена:** ${price} ₽\n` +
+      `**Доступное количество:** ${itemsavailable}`;
+
+    // Логируем текст для диагностики
+    console.log('Product caption/text:', caption);
 
     if (product.image && product.image.startsWith('http')) {
       return {
