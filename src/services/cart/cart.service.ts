@@ -1,22 +1,24 @@
-import { Bot, Context } from 'grammy';
+import { Bot, Context, InlineKeyboard } from 'grammy';
 import { CatalogRepository } from '../catalog/catalog.repository';
+import { CatalogService } from '../catalog/catalog.service';
 import { CartView } from './cart.view';
 import { CallbackDataRoutes } from '../../consts';
 import { MessageController } from '../../message';
 import { RedisClientType } from 'redis';
 import { Cart, CartRepository } from './cart.repository';
 
-const addProductRexExp = new RegExp(`^${CallbackDataRoutes.cart}:add:(\\d+)$`);
-const delProductRexExp = new RegExp(`^${CallbackDataRoutes.cart}:del:(\\d+)$`);
-const incProductRexExp = new RegExp(`^${CallbackDataRoutes.cart}:inc:(\\d+)$`);
-const decProductRexExp = new RegExp(`^${CallbackDataRoutes.cart}:dec:(\\d+)$`);
+const addProductRexExp = new RegExp(`^${CallbackDataRoutes.cartAdd}:(\\d+)$`);
+const delProductRexExp = new RegExp(`^${CallbackDataRoutes.cartDel}:(\\d+)$`);
+const incProductRexExp = new RegExp(`^${CallbackDataRoutes.cartInc}:(\\d+)$`);
+const decProductRexExp = new RegExp(`^${CallbackDataRoutes.cartDec}:(\\d+)$`);
 
 export class CartService {
   private bot: Bot;
   private repository: CartRepository;
   private catalogRepository: CatalogRepository;
+  private catalogService: CatalogService;
   private view: CartView;
-  private messageController: MessageController | undefined;
+  private messageController: MessageController;
   private redis: RedisClientType;
   private readonly MAX_QUANTITY = 10;
   private readonly PRICE_CACHE_TTL = 24 * 60 * 60;
@@ -25,12 +27,14 @@ export class CartService {
     bot: Bot,
     repository: CartRepository,
     catalogRepository: CatalogRepository,
+    catalogService: CatalogService,
     redis: RedisClientType,
-    messageController?: MessageController,
+    messageController: MessageController,
   ) {
     this.bot = bot;
     this.repository = repository;
     this.catalogRepository = catalogRepository;
+    this.catalogService = catalogService;
     this.redis = redis;
     this.view = new CartView(catalogRepository);
     this.messageController = messageController;
@@ -40,6 +44,7 @@ export class CartService {
       hasBot: !!bot,
       hasRepository: !!repository,
       hasCatalogRepository: !!catalogRepository,
+      hasCatalogService: !!catalogService,
       hasRedis: !!redis,
       hasMessageController: !!messageController,
     });
@@ -54,16 +59,13 @@ export class CartService {
   }
 
   async handleCart(ctx: Context): Promise<void> {
-    if (!this.messageController) {
-      console.error('handleCart: messageController is undefined', { ctxUpdate: ctx.update });
-      await ctx.reply('Произошла ошибка: сервис сообщений недоступен', {});
-      await ctx.answerCallbackQuery();
-      return;
-    }
     const userId = this.messageController.getUserId(ctx);
     if (!userId) {
-      await this.messageController.reply(ctx, 'Произошла ошибка', {}, true);
-      await ctx.answerCallbackQuery();
+      console.warn('handleCart: Invalid userId', { ctxUpdate: ctx.update });
+      await ctx.answerCallbackQuery({
+        text: '❌ Ошибка: неверный пользователь',
+        show_alert: true,
+      });
       return;
     }
 
@@ -81,24 +83,15 @@ export class CartService {
       await ctx.answerCallbackQuery();
     } catch (error) {
       console.error('Ошибка в handleCart:', error);
-      await this.messageController.reply(ctx, 'Произошла ошибка при открытии корзины.', {
-        parse_mode: 'HTML',
-      }, true);
-      await ctx.answerCallbackQuery();
+      await ctx.answerCallbackQuery({
+        text: '❌ Ошибка при открытии корзины',
+        show_alert: true,
+      });
     }
   }
 
   async handleAddProduct(ctx: Context): Promise<void> {
     console.log('handleAddProduct called with callback:', ctx.callbackQuery?.data);
-
-    if (!this.messageController) {
-      console.error('handleAddProduct: messageController is undefined', { ctxUpdate: ctx.update });
-      await ctx.answerCallbackQuery({
-        text: '❌ Ошибка: сервис сообщений недоступен',
-        show_alert: true,
-      });
-      return;
-    }
 
     const callbackData = ctx.callbackQuery?.data;
     if (!callbackData) {
@@ -110,9 +103,11 @@ export class CartService {
       return;
     }
 
-    const match = callbackData.match(/^cart:add:(\d+)$/);
+    const match = callbackData.match(/^cart:add:(\d+)$/); // Исправили на cart:add
+    console.log('Callback parse result:', { callbackData, match });
     const productId = match ? Number(match[1]) : 0;
     const userId = this.messageController.getUserId(ctx);
+    console.log('Parsed userId and productId:', { userId, productId });
 
     if (!userId || !productId) {
       console.warn('Invalid userId or productId:', { userId, productId });
@@ -128,7 +123,6 @@ export class CartService {
       const product = await this.catalogRepository.getProductDetail(productId);
       console.log('Product fetched:', product);
 
-      // Проверяем доступность товара
       if (product.itemsavailable <= 0) {
         console.warn('Product is out of stock:', productId);
         await ctx.answerCallbackQuery({
@@ -175,7 +169,47 @@ export class CartService {
       await this.repository.saveCart(userId, cart);
       console.log('Cart updated:', cart);
 
-      // Успешное добавление: показываем алерт
+      console.log('Updating product card for product:', productId);
+      const message = ctx.callbackQuery?.message;
+      if (message) {
+        try {
+          const [neighbors, prevCallback] = await Promise.all([
+            this.catalogRepository.getNeighborProducts(productId),
+            this.messageController.getPreviousCallbackData(ctx),
+          ]);
+          const backCallback: string | undefined = prevCallback ?? undefined;
+
+          const response = this.catalogService.getView().renderProduct(
+            product,
+            neighbors.prevId,
+            neighbors.nextId,
+            backCallback,
+            true,
+          );
+
+          if ('photo' in response) {
+            console.log('Editing photo message with updated keyboard');
+            await ctx.editMessageMedia(
+              {
+                type: 'photo',
+                media: response.photo,
+                caption: response.caption,
+                parse_mode: 'HTML',
+              },
+              { reply_markup: response.reply_markup },
+            );
+          } else {
+            console.log('Editing text message with updated keyboard');
+            await ctx.editMessageText(response.text, {
+              reply_markup: response.reply_markup,
+              parse_mode: 'HTML',
+            });
+          }
+        } catch (editError) {
+          console.warn('Failed to edit product card:', editError);
+        }
+      }
+
       console.log('Sending success alert for product:', product.name);
       await ctx.answerCallbackQuery({
         text: `✅ Товар ${this.escapeText(product.name)} добавлен в корзину!`,
@@ -196,35 +230,37 @@ export class CartService {
   }
 
   async handleDeleteProduct(ctx: Context): Promise<void> {
-    if (!this.messageController) {
-      console.error('handleDeleteProduct: messageController is undefined', { ctxUpdate: ctx.update });
-      await ctx.reply('Произошла ошибка: сервис сообщений недоступен', {});
-      await ctx.answerCallbackQuery();
-      return;
-    }
-
     const callbackData = ctx.callbackQuery?.data;
     if (!callbackData) {
-      await this.messageController.reply(ctx, 'Произошла ошибка', {}, true);
-      await ctx.answerCallbackQuery();
+      console.warn('No callback data provided');
+      await ctx.answerCallbackQuery({
+        text: '❌ Ошибка: данные запроса отсутствуют',
+        show_alert: true,
+      });
       return;
     }
 
-    const match = callbackData.match(/^cart:del:(\d+)$/);
+    const match = callbackData.match(/^cartDel:(\d+)$/);
     const productId = match ? Number(match[1]) : 0;
     const userId = this.messageController.getUserId(ctx);
 
     if (!userId || !productId) {
-      await this.messageController.reply(ctx, 'Произошла ошибка', {}, true);
-      await ctx.answerCallbackQuery();
+      console.warn('Invalid userId or productId:', { userId, productId });
+      await ctx.answerCallbackQuery({
+        text: '❌ Ошибка: неверный пользователь или продукт',
+        show_alert: true,
+      });
       return;
     }
 
     try {
       const cart = await this.repository.getCart(userId);
       if (!cart.products[productId]) {
-        await this.messageController.reply(ctx, 'Продукт не найден в корзине', {}, true);
-        await ctx.answerCallbackQuery();
+        console.log('Product not found in cart:', productId);
+        await ctx.answerCallbackQuery({
+          text: '❌ Продукт не найден в корзине',
+          show_alert: true,
+        });
         return;
       }
 
@@ -242,54 +278,54 @@ export class CartService {
       await ctx.answerCallbackQuery();
     } catch (error) {
       console.error('Ошибка в handleDeleteProduct:', error);
-      await this.messageController.reply(ctx, 'Произошла ошибка при удалении из корзины.', {
-        parse_mode: 'HTML',
-      }, true);
-      await ctx.answerCallbackQuery();
+      await ctx.answerCallbackQuery({
+        text: '❌ Ошибка при удалении из корзины',
+        show_alert: true,
+      });
     }
   }
 
   async handleIncreaseQty(ctx: Context): Promise<void> {
-    if (!this.messageController) {
-      console.error('handleIncreaseQty: messageController is undefined', { ctxUpdate: ctx.update });
-      await ctx.reply('Произошла ошибка: сервис сообщений недоступен', {});
-      await ctx.answerCallbackQuery();
-      return;
-    }
-
     const callbackData = ctx.callbackQuery?.data;
     if (!callbackData) {
-      await this.messageController.reply(ctx, 'Произошла ошибка', {}, true);
-      await ctx.answerCallbackQuery();
+      console.warn('No callback data provided');
+      await ctx.answerCallbackQuery({
+        text: '❌ Ошибка: данные запроса отсутствуют',
+        show_alert: true,
+      });
       return;
     }
 
-    const match = callbackData.match(/^cart:inc:(\d+)$/);
+    const match = callbackData.match(/^cartInc:(\d+)$/);
     const productId = match ? Number(match[1]) : 0;
     const userId = this.messageController.getUserId(ctx);
 
     if (!userId || !productId) {
-      await this.messageController.reply(ctx, 'Произошла ошибка', {}, true);
-      await ctx.answerCallbackQuery();
+      console.warn('Invalid userId or productId:', { userId, productId });
+      await ctx.answerCallbackQuery({
+        text: '❌ Ошибка: неверный пользователь или продукт',
+        show_alert: true,
+      });
       return;
     }
 
     try {
       const cart = await this.repository.getCart(userId);
       if (!cart.products[productId]) {
-        await this.messageController.reply(ctx, 'Продукт не найден в корзине', {}, true);
-        await ctx.answerCallbackQuery();
+        console.log('Product not found in cart:', productId);
+        await ctx.answerCallbackQuery({
+          text: '❌ Продукт не найден в корзине',
+          show_alert: true,
+        });
         return;
       }
 
       if (cart.products[productId].qty >= this.MAX_QUANTITY) {
-        await this.messageController.reply(
-          ctx,
-          `Максимум ${this.MAX_QUANTITY} единиц одного товара`,
-          {},
-          true,
-        );
-        await ctx.answerCallbackQuery();
+        console.log('Max quantity reached:', productId);
+        await ctx.answerCallbackQuery({
+          text: `❌ Максимум ${this.MAX_QUANTITY} единиц одного товара`,
+          show_alert: true,
+        });
         return;
       }
 
@@ -307,43 +343,45 @@ export class CartService {
       await ctx.answerCallbackQuery();
     } catch (error) {
       console.error('Ошибка в handleIncreaseQty:', error);
-      await this.messageController.reply(ctx, 'Произошла ошибка при изменении количества.', {
-        parse_mode: 'HTML',
-      }, true);
-      await ctx.answerCallbackQuery();
+      await ctx.answerCallbackQuery({
+        text: '❌ Ошибка при изменении количества',
+        show_alert: true,
+      });
     }
   }
 
   async handleDecreaseQty(ctx: Context): Promise<void> {
-    if (!this.messageController) {
-      console.error('handleDecreaseQty: messageController is undefined', { ctxUpdate: ctx.update });
-      await ctx.reply('Произошла ошибка: сервис сообщений недоступен', {});
-      await ctx.answerCallbackQuery();
-      return;
-    }
-
     const callbackData = ctx.callbackQuery?.data;
     if (!callbackData) {
-      await this.messageController.reply(ctx, 'Произошла ошибка', {}, true);
-      await ctx.answerCallbackQuery();
+      console.warn('No callback data provided');
+      await ctx.answerCallbackQuery({
+        text: '❌ Ошибка: данные запроса отсутствуют',
+        show_alert: true,
+      });
       return;
     }
 
-    const match = callbackData.match(/^cart:dec:(\d+)$/);
+    const match = callbackData.match(/^cartDec:(\d+)$/);
     const productId = match ? Number(match[1]) : 0;
     const userId = this.messageController.getUserId(ctx);
 
     if (!userId || !productId) {
-      await this.messageController.reply(ctx, 'Произошла ошибка', {}, true);
-      await ctx.answerCallbackQuery();
+      console.warn('Invalid userId or productId:', { userId, productId });
+      await ctx.answerCallbackQuery({
+        text: '❌ Ошибка: неверный пользователь или продукт',
+        show_alert: true,
+      });
       return;
     }
 
     try {
       const cart = await this.repository.getCart(userId);
       if (!cart.products[productId]) {
-        await this.messageController.reply(ctx, 'Продукт не найден в корзине', {}, true);
-        await ctx.answerCallbackQuery();
+        console.log('Product not found in cart:', productId);
+        await ctx.answerCallbackQuery({
+          text: '❌ Продукт не найден в корзине',
+          show_alert: true,
+        });
         return;
       }
 
@@ -365,10 +403,10 @@ export class CartService {
       await ctx.answerCallbackQuery();
     } catch (error) {
       console.error('Ошибка в handleDecreaseQty:', error);
-      await this.messageController.reply(ctx, 'Произошла ошибка при изменении количества.', {
-        parse_mode: 'HTML',
-      }, true);
-      await ctx.answerCallbackQuery();
+      await ctx.answerCallbackQuery({
+        text: '❌ Ошибка при изменении количества',
+        show_alert: true,
+      });
     }
   }
 
@@ -397,7 +435,6 @@ export class CartService {
   }
 
   private escapeText(text: string): string {
-    // Экранируем текст для использования в алертах (без форматирования)
     return text.replace(/([_*[\]()~`>#+\-=|{}.!])/g, '\\$1');
   }
 }

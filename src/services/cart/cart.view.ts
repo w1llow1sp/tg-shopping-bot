@@ -36,9 +36,9 @@ export class CartView {
       keyboard
         .text(`${productName}`, `${CallbackDataRoutes.product}:${product.id}`)
         .row()
-        .text('❌️', `${CallbackDataRoutes.cart}:del:${product.id}`)
-        .text('-', `${CallbackDataRoutes.cart}:dec:${product.id}`)
-        .text('+', `${CallbackDataRoutes.cart}:inc:${product.id}`)
+        .text('❌️', `${CallbackDataRoutes.cartDel}:${product.id}`)
+        .text('-', `${CallbackDataRoutes.cartDec}:${product.id}`)
+        .text('+', `${CallbackDataRoutes.cartInc}:${product.id}`)
         .row();
     }
 
@@ -56,9 +56,9 @@ export class CartView {
   async renderProductAddedMessage(ctx: Context, productId: number): Promise<Response> {
     const product = await this.catalogRepository.getProductDetail(productId);
     const keyboard = new InlineKeyboard()
-      .text('❌', `${CallbackDataRoutes.cart}:del:${productId}`)
-      .text('+', `${CallbackDataRoutes.cart}:inc:${productId}`)
-      .text('-', `${CallbackDataRoutes.cart}:dec:${productId}`)
+      .text('❌', `${CallbackDataRoutes.cartDel}:${productId}`)
+      .text('+', `${CallbackDataRoutes.cartInc}:${productId}`)
+      .text('-', `${CallbackDataRoutes.cartDec}:${productId}`)
       .row()
       .text('Вернуться в меню', CallbackDataRoutes.main)
       .text('Каталог', `${CallbackDataRoutes.catalog}:0`);

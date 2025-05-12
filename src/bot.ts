@@ -26,9 +26,11 @@ new MenuService(bot, menuRepository, messageController);
 const catalogRepository = new CatalogRepository(pool);
 new CatalogService(bot, catalogRepository, messageController);
 
+const catalogService = new CatalogService(bot, catalogRepository, messageController);
+
 // Initialize repositories
 const cartRepository = new CartRepository(pool, RedisConn);
-new CartService(bot, cartRepository, catalogRepository, RedisConn, messageController);
+new CartService(bot, cartRepository, catalogRepository,catalogService, RedisConn, messageController);
 
 
 export async function setWebhook() {

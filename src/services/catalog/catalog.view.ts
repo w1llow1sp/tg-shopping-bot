@@ -14,13 +14,12 @@ export class CatalogView {
   }
 
   private escapeHTML(text: string): string {
-    // Экранируем специальные символы для HTML, включая дополнительные случаи
     return text
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
+      .replace(/&/g, '&')
+      .replace(/</g, '<')
+      .replace(/>/g, '>')
+      .replace(/"/g, '"')
+      .replace(/'/g, '\'')
   }
 
   renderCatalog(
@@ -71,6 +70,7 @@ export class CatalogView {
     prevProductId: number | null = null,
     nextProductId: number | null = null,
     backCallback?: string,
+    isAdded: boolean = false, // Новый параметр
   ): CatalogResponse {
     const keyboard = new InlineKeyboard();
 
@@ -88,10 +88,14 @@ export class CatalogView {
         .row();
     }
 
-    // Кнопка "Добавить в корзину"
-    keyboard
-      .text('Добавить в корзину 🧺', `${CallbackDataRoutes.cart}:add:${product.id}`)
-      .row();
+    // Кнопка в зависимости от состояния
+    if (isAdded) {
+      keyboard.text('Перейти в корзину 🛒', CallbackDataRoutes.cart).row();
+    } else {
+      keyboard
+        .text('Добавить в корзину 🧺', `${CallbackDataRoutes.cartAdd}:${product.id}`)
+        .row();
+    }
 
     // Кнопка "Назад" (всегда отображается)
     const backCallbackValue = backCallback || `${CallbackDataRoutes.catalog}:0`;
@@ -107,11 +111,9 @@ export class CatalogView {
       `<b>Цена:</b> ${price} ₽\n` +
       `<b>Доступное количество:</b> ${itemsavailable}`;
 
-    // Логируем текст и его длину для диагностики
     console.log('Product caption/text:', caption);
     console.log('Caption length (bytes):', Buffer.byteLength(caption, 'utf8'));
 
-    // Проверяем, является ли URL изображения валидным
     const isValidImageUrl = product.image && /^https?:\/\/.*\.(jpg|jpeg|png|gif)$/i.test(product.image);
 
     if (isValidImageUrl) {

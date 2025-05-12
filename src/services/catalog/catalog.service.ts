@@ -1,4 +1,4 @@
-import { Bot, Context, InlineKeyboard, InputFile } from 'grammy';
+import { Bot, Context, InlineKeyboard } from 'grammy';
 import { CatalogRepository } from './catalog.repository';
 import { CatalogView } from './catalog.view';
 import { CallbackDataRoutes } from '../../consts';
@@ -37,6 +37,11 @@ export class CatalogService {
     this.bot.callbackQuery(productRexExp, this.handleProduct.bind(this));
   }
 
+  // Новый метод для доступа к CatalogView
+  getView(): CatalogView {
+    return this.view;
+  }
+
   async handleCatalog(ctx: Context): Promise<void> {
     await this.messageController.savePreviousCallbackData(ctx);
     const match = ctx.callbackQuery?.data?.match(/^catalog:(\d+)$/);
@@ -54,7 +59,6 @@ export class CatalogService {
       console.log('Catalog response:', JSON.stringify(response, null, 2));
       const textResponse = response as { text: string; reply_markup: InlineKeyboard };
 
-      // Проверяем, можно ли редактировать текущее сообщение
       const message = ctx.callbackQuery?.message;
       if (message) {
         try {
@@ -66,12 +70,10 @@ export class CatalogService {
         } catch (editError) {
           console.warn('Failed to edit catalog message, sending new one:', editError);
           try {
-            // Пытаемся удалить старое сообщение
             await ctx.deleteMessage();
           } catch (deleteError) {
             console.warn('Failed to delete message:', deleteError);
           }
-          // Отправляем новое сообщение
           await this.messageController.reply(ctx, textResponse.text, {
             reply_markup: textResponse.reply_markup,
             parse_mode: 'HTML',
@@ -88,8 +90,10 @@ export class CatalogService {
       await ctx.answerCallbackQuery();
     } catch (error) {
       console.error('Ошибка в handleCatalog:', error);
-      await ctx.reply(this.view.renderErrorMessage(), { parse_mode: 'HTML' });
-      await ctx.answerCallbackQuery();
+      await ctx.answerCallbackQuery({
+        text: '❌ Ошибка при загрузке каталога',
+        show_alert: true,
+      });
     }
   }
 
@@ -100,23 +104,22 @@ export class CatalogService {
       console.log('Handling product with ID:', productId);
       if (!productId) {
         console.log('Invalid product ID');
-        await ctx.reply('Неверный ID продукта.', { parse_mode: 'HTML' });
-        await ctx.answerCallbackQuery();
+        await ctx.answerCallbackQuery({
+          text: '❌ Неверный ID продукта',
+          show_alert: true,
+        });
         return;
       }
 
-      // Получаем продукт и соседние товары
       const [product, neighbors] = await Promise.all([
         this.repository.getProductDetail(productId),
         this.repository.getNeighborProducts(productId),
       ]);
       console.log('Fetched product:', product, 'Neighbors:', neighbors);
 
-      // Получаем предыдущие данные для кнопки "Назад"
       const prevCallback = await this.messageController.getPreviousCallbackData(ctx);
       console.log('Previous callback data:', prevCallback);
 
-      // Преобразуем null в undefined
       const backCallback: string | undefined = prevCallback ?? undefined;
 
       const response = this.view.renderProduct(
@@ -127,7 +130,6 @@ export class CatalogService {
       );
       console.log('Render product response:', response);
 
-      // Проверяем, можно ли редактировать сообщение
       const message = ctx.callbackQuery?.message;
       if (message) {
         try {
@@ -152,12 +154,10 @@ export class CatalogService {
         } catch (editError) {
           console.warn('Failed to edit message:', editError);
           try {
-            // Пытаемся удалить старое сообщение
             await ctx.deleteMessage();
           } catch (deleteError) {
             console.warn('Failed to delete message:', deleteError);
           }
-          // Отправляем новое сообщение
           if ('photo' in response) {
             console.log('Sending new photo response');
             try {
@@ -192,7 +192,6 @@ export class CatalogService {
           }
         }
       } else {
-        // Если редактировать нечего, отправляем новое сообщение
         if ('photo' in response) {
           console.log('Sending new photo response');
           try {
@@ -227,13 +226,14 @@ export class CatalogService {
         }
       }
 
-      // Удаляем предыдущие данные callback
       await this.messageController.delPreviousCallbackData(ctx);
       await ctx.answerCallbackQuery();
     } catch (error) {
       console.error('Ошибка в handleProduct:', error);
-      await ctx.reply(this.view.renderErrorMessage(), { parse_mode: 'HTML' });
-      await ctx.answerCallbackQuery();
+      await ctx.answerCallbackQuery({
+        text: '❌ Ошибка при загрузке продукта',
+        show_alert: true,
+      });
     }
   }
 }
