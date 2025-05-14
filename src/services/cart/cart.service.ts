@@ -1,4 +1,4 @@
-import { Bot, Context, InlineKeyboard } from 'grammy';
+import { Bot, Context } from 'grammy';
 import { CatalogRepository } from '../catalog/catalog.repository';
 import { CatalogService } from '../catalog/catalog.service';
 import { CartView } from './cart.view';
@@ -76,10 +76,13 @@ export class CartService {
 
       const response = await this.view.renderCartMessage(cart);
       console.log('Render cart response:', response);
+      console.log('handleCart: callback message exists:', !!ctx.callbackQuery?.message);
+
       await this.messageController.reply(ctx, response.text, {
         reply_markup: response.reply_markup,
         parse_mode: 'HTML',
       }, true);
+
       await ctx.answerCallbackQuery();
     } catch (error) {
       console.error('Ошибка в handleCart:', error);
@@ -103,7 +106,7 @@ export class CartService {
       return;
     }
 
-    const match = callbackData.match(/^cart:add:(\d+)$/); // Исправили на cart:add
+    const match = callbackData.match(/^cart:add:(\d+)$/);
     console.log('Callback parse result:', { callbackData, match });
     const productId = match ? Number(match[1]) : 0;
     const userId = this.messageController.getUserId(ctx);

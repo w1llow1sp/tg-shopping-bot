@@ -22,11 +22,14 @@ export class MessageController {
     } else {
       userId = null;
     }
+    console.log('getUserId called:', { userId });
     return userId;
   }
 
   private getCallbackMessageId(ctx: Context): number | null {
-    return ctx.update.callback_query?.message?.message_id ?? null;
+    const messageId = ctx.update.callback_query?.message?.message_id ?? null;
+    console.log('getCallbackMessageId:', { messageId });
+    return messageId;
   }
 
   private getCallbackKeyboard(ctx: Context) {
@@ -34,7 +37,13 @@ export class MessageController {
   }
 
   private isPhotoMessage(ctx: Context): boolean {
-    return !!ctx.update.callback_query?.message?.photo;
+    const isPhoto = !!ctx.update.callback_query?.message?.photo;
+    console.log('isPhotoMessage:', {
+      isPhoto,
+      hasMessage: !!ctx.update.callback_query?.message,
+      chatId: ctx.update.callback_query?.message?.chat.id,
+    });
+    return isPhoto;
   }
 
   async saveActiveMessageId(ctx: Context, messageId: number): Promise<void> {
@@ -73,19 +82,32 @@ export class MessageController {
   ) {
     const activeMessageId = await this.getActiveMessageId(ctx) ?? this.getCallbackMessageId(ctx);
     const userId = this.getUserId(ctx);
+    const chatId = ctx.chat?.id ?? ctx.update.callback_query?.message?.chat.id;
 
     if (addNavigationButtons && options.reply_markup) {
       this.addNavigationButtons(options.reply_markup);
     }
 
-    try {
-      if (activeMessageId === null || userId === null) {
-        console.log('No active message ID, sending new message');
+    console.log('MessageController.reply called:', {
+      activeMessageId,
+      userId,
+      chatId,
+      isPhoto,
+      hasPhoto: this.isPhotoMessage(ctx),
+    });
+
+    if (activeMessageId === null || userId === null || chatId === null) {
+      console.log('No active message ID or user/chat ID, sending new message');
+      try {
         const message = await ctx.reply(text, options);
         await this.saveActiveMessageId(ctx, message.message_id);
-        return;
+      } catch (error) {
+        console.error('Error sending new message:', error);
       }
+      return;
+    }
 
+    try {
       console.log(`Editing message ID: ${activeMessageId}, isPhoto: ${isPhoto}, hasPhoto: ${this.isPhotoMessage(ctx)}`);
       if (isPhoto && this.isPhotoMessage(ctx)) {
         await ctx.api.editMessageCaption(userId, activeMessageId, {
@@ -93,6 +115,21 @@ export class MessageController {
           reply_markup: options.reply_markup,
           parse_mode: options.parse_mode,
         });
+      } else if (!isPhoto && this.isPhotoMessage(ctx)) {
+        // Фото → текст: удаляем старое сообщение и отправляем новое
+        console.log(`Cannot edit photo to text, deleting message ID: ${activeMessageId}`);
+        const deleteChatId = ctx.update.callback_query?.message?.chat.id;
+        if (deleteChatId) {
+          try {
+            await ctx.api.deleteMessage(deleteChatId, activeMessageId);
+          } catch (deleteError) {
+            console.warn('Failed to delete message:', deleteError);
+          }
+        } else {
+          console.warn('No chatId available for deleting message');
+        }
+        const message = await ctx.reply(text, options);
+        await this.saveActiveMessageId(ctx, message.message_id);
       } else {
         await ctx.api.editMessageText(userId, activeMessageId, text, {
           reply_markup: options.reply_markup,
@@ -101,8 +138,8 @@ export class MessageController {
       }
     } catch (error) {
       console.error('Error in MessageController.reply:', error);
+      console.log('Retrying with new message due to edit failure');
       try {
-        console.log('Retrying with new message due to edit failure');
         const message = await ctx.reply(text, options);
         await this.saveActiveMessageId(ctx, message.message_id);
       } catch (retryError) {
@@ -118,10 +155,17 @@ export class MessageController {
   ) {
     const activeMessageId = await this.getActiveMessageId(ctx) ?? this.getCallbackMessageId(ctx);
     const userId = this.getUserId(ctx);
+    const chatId = ctx.chat?.id ?? ctx.update.callback_query?.message?.chat.id;
+
+    console.log('MessageController.replyWithPhoto called:', {
+      activeMessageId,
+      userId,
+      chatId,
+    });
 
     try {
-      if (activeMessageId === null || userId === null) {
-        console.log('No active message ID, sending new photo');
+      if (activeMessageId === null || userId === null || chatId === null) {
+        console.log('No active message ID or user/chat ID, sending new photo');
         const message = await ctx.replyWithPhoto(photo, options);
         await this.saveActiveMessageId(ctx, message.message_id);
         return;
@@ -138,8 +182,8 @@ export class MessageController {
       });
     } catch (error) {
       console.error('Error in MessageController.replyWithPhoto:', error);
+      console.log('Retrying with new photo due to edit failure');
       try {
-        console.log('Retrying with new photo due to edit failure');
         const message = await ctx.replyWithPhoto(photo, options);
         await this.saveActiveMessageId(ctx, message.message_id);
       } catch (retryError) {
