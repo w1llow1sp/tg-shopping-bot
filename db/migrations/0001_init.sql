@@ -7,7 +7,8 @@ CREATE TABLE IF NOT EXISTS catalog (
     name TEXT NOT NULL,
     description TEXT,
     price INTEGER NOT NULL,
-    image TEXT
+    image TEXT,
+    itemsavailable INTEGER NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS cart (

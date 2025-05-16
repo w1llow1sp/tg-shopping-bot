@@ -1,6 +1,6 @@
 import { Bot, Context, InlineKeyboard } from 'grammy';
-import { MenuRepository } from './repository';
-import { MenuView } from './view';
+import { MenuRepository } from './menu.repository';
+import { MenuView } from './menu.view';
 import { CallbackDataRoutes } from '../../consts';
 import { MessageController } from '../../message';
 

@@ -3,9 +3,12 @@
     "target": "ES6",
     "module": "commonjs",
     "strict": true,
+    "types": ["jest","node"],
     "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
     "outDir": "./dist",
-    "rootDir": "./src"
+    "rootDir": "./src",
   },
   "include": ["src/**/*"]
 }

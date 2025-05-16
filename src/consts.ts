@@ -6,8 +6,8 @@ export interface Env {
   BOT_TOKEN: string;
   WEBHOOK_URL: string;
   PORT?: string;
-  POSTGRESQL_DSN?:string;
-  REDIS_DSN?:string;
+  POSTGRESQL_DSN?: string;
+  REDIS_DSN?: string;
 }
 
 export const env: Env = {
@@ -24,4 +24,8 @@ export enum CallbackDataRoutes {
   orders = 'orders',
   cart = 'cart',
   product = 'product',
+  cartAdd = 'cart:add',
+  cartDel = 'cart:del',
+  cartInc = 'cart:inc',
+  cartDec = 'cart:dec',
 }

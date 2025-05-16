@@ -1,12 +1,12 @@
 import { Bot } from 'grammy';
 import { env } from './consts';
-import { MenuService } from './services/menu/service';
+import { MenuService } from './services/menu/menu.service';
 import { pool } from './db/pg';
-import { CatalogService } from './services/catalog/service';
-import { CatalogRepository } from './services/catalog/repository';
-import { MenuRepository } from './services/menu/repository';
-import { CartRepository } from './services/cart/repository';
-import { CartService } from './services/cart/service';
+import { CatalogService } from './services/catalog/catalog.service';
+import { CatalogRepository } from './services/catalog/catalog.repository';
+import { MenuRepository } from './services/menu/menu.repository';
+import { CartRepository } from './services/cart/cart.repository';
+import { CartService } from './services/cart/cart.service';
 import { RedisConn } from './db/redis';
 import { MessageController } from './message';
 
@@ -26,8 +26,11 @@ new MenuService(bot, menuRepository, messageController);
 const catalogRepository = new CatalogRepository(pool);
 new CatalogService(bot, catalogRepository, messageController);
 
-const cartRepository = new CartRepository(RedisConn);
-new CartService(bot, cartRepository, messageController);
+const catalogService = new CatalogService(bot, catalogRepository, messageController);
+
+// Initialize repositories
+const cartRepository = new CartRepository(pool, RedisConn);
+new CartService(bot, cartRepository, catalogRepository,catalogService, RedisConn, messageController);
 
 
 export async function setWebhook() {
