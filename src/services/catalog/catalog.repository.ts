@@ -1,5 +1,7 @@
 import { Pool } from 'pg';
+import { ErrorMessages, SQL_QUERIES } from './catalog.dictionaries';
 
+// Интерфейс для описания структуры товара в каталоге
 export interface Product {
   id: number;
   name: string;
@@ -9,6 +11,10 @@ export interface Product {
   itemsavailable: number;
 }
 
+/**
+ * Репозиторий для менеджемента продуктов в каталоге в PostgreSQL
+ */
+
 export class CatalogRepository {
   private pool: Pool;
 
@@ -16,68 +22,89 @@ export class CatalogRepository {
     this.pool = pool;
   }
 
+  /**
+   * Получение списка товаров с пагинацией
+   * @param limit -- Количество товаров на странице;
+   * @param offset -- Смещение для пагинации
+   *
+   * @returns Массив товаров
+   */
   async getProducts(limit: number, offset: number): Promise<Product[]> {
-    const sql = 'SELECT id, name, description, price, image, itemsavailable FROM catalog ORDER BY id LIMIT $1 OFFSET $2';
     try {
-      const products = await this.pool.query<Product>(sql, [limit, offset]);
-      console.log('Successfully fetched products from catalog:', products.rows);
+      const products = await this.pool.query<Product>(
+        SQL_QUERIES.GET_PRODUCTS,
+        [limit, offset],
+      );
+      console.log('Успешно получены товары из каталога:', products.rows);
       return products.rows;
     } catch (error) {
       console.error('Ошибка в getProducts:', error);
-      throw new Error('Failed to fetch products from catalog');
+      throw new Error(ErrorMessages.FETCH_PRODUCTS_FAILED);
     }
   }
 
+  /**
+   * Получение общего количества товаров в каталоге
+   *  @returns Общее количество товаров
+   */
   async getTotalProducts(): Promise<number> {
-    const sql = 'SELECT COUNT(*) as count FROM catalog';
     try {
-      const result = await this.pool.query<{ count: string }>(sql);
+      const result = await this.pool.query<{ count: string }>(SQL_QUERIES.GET_TOTAL_PRODUCTS);
       const total = parseInt(result.rows[0].count, 10);
-      console.log('Successfully fetched total products from catalog:', total);
+      console.log('Успешно получено общее количество товаров:', total);
       return total;
     } catch (error) {
       console.error('Ошибка в getTotalProducts:', error);
-      throw new Error('Failed to fetch total products from catalog');
+      throw new Error(ErrorMessages.FETCH_TOTAL_PRODUCTS_FAILED);
     }
   }
 
+  /**
+   * Получение детальной информации о товаре по ID
+   * @param productId : ID товара
+   * @returns Объект товара
+   * @throws Error, если товар не найден
+   */
   async getProductDetail(productId: number): Promise<Product> {
-    const sql = 'SELECT id, name, description, price, image, itemsavailable FROM catalog WHERE id = $1';
     try {
-      const products = await this.pool.query<Product>(sql, [productId]);
-      console.log('Successfully fetched product detail:', products.rows[0]);
+      const products = await this.pool.query<Product>(SQL_QUERIES.GET_PRODUCT_DETAIL, [productId]);
       if (products.rows.length === 0) {
-        throw new Error(`Product with ID ${productId} not found`);
+        console.warn(`Товар с ID ${productId} не найден`);
+        throw new Error(`${ErrorMessages.PRODUCT_NOT_FOUND}: ${productId}`);
       }
+      console.log('Успешно получены детали товара:', products.rows[0]);
       return products.rows[0];
     } catch (error) {
       console.error('Ошибка в getProductDetail:', error);
-      throw error;
+      throw error instanceof Error && error.message.includes(ErrorMessages.PRODUCT_NOT_FOUND)
+        ? error
+        : new Error(ErrorMessages.FETCH_PRODUCT_DETAIL_FAILED);
     }
   }
 
-  async getNeighborProducts(productId: number): Promise<{ prevId: number | null; nextId: number | null }> {
+  /**
+   *  Получение ID соседних товаров (предыдущего и следующего)
+   * @param productId : ID текущего товара
+   * @returns Объект с ID предыдущего и следующего товаров (или null, если их нет)
+   */
+  async getNeighborProducts(
+    productId: number,
+  ): Promise<{ prevId: number | null; nextId: number | null }> {
     try {
       const [prevResult, nextResult] = await Promise.all([
-        // Находим предыдущий товар (меньший ID)
-        this.pool.query<{ id: number }>(
-          'SELECT id FROM catalog WHERE id < $1 ORDER BY id DESC LIMIT 1',
-          [productId],
-        ),
-        // Находим следующий товар (больший ID)
-        this.pool.query<{ id: number }>(
-          'SELECT id FROM catalog WHERE id > $1 ORDER BY id ASC LIMIT 1',
-          [productId],
-        ),
+        this.pool.query<{ id: number }>(SQL_QUERIES.GET_PREV_PRODUCT, [productId]),
+        this.pool.query<{ id: number }>(SQL_QUERIES.GET_NEXT_PRODUCT, [productId]),
       ]);
-
-      return {
+      const result = {
         prevId: prevResult.rows.length > 0 ? prevResult.rows[0].id : null,
         nextId: nextResult.rows.length > 0 ? nextResult.rows[0].id : null,
       };
+      console.log('Успешно получены соседние товары:', result);
+      return result;
+
     } catch (error) {
       console.error('Ошибка в getNeighborProducts:', error);
-      throw new Error('Failed to fetch neighbor products');
+      throw new Error(ErrorMessages.FETCH_NEIGHBOR_PRODUCTS_FAILED);
     }
   }
 }
