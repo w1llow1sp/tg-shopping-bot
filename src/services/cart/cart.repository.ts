@@ -1,90 +1,103 @@
 import { RedisClientType } from 'redis';
 import { Pool } from 'pg';
+import { CartConfig, CartQueries } from './cart.dictionaries';
 
+// Интерфейс для продукта в корзине
 export interface ProductCart {
   id: number;
   qty: number;
 }
 
+// Интерфейс корзины пользователя
 export interface Cart {
   total: number;
   products: { [productId: number]: ProductCart };
 }
 
+// Репозиторий для работы с корзиной
+// Отвечает за получение, сохранение и кэширование данных корзины
 export class CartRepository {
   private pool: Pool;
   private redis: RedisClientType;
-  private readonly CACHE_TTL = 24 * 60 * 60; // 24 часа
 
   constructor(pool: Pool, redis: RedisClientType) {
     this.pool = pool;
     this.redis = redis;
   }
 
+  // Получение корзины пользователя
   async getCart(userId: number): Promise<Cart> {
     // Проверяем кэш
     const cacheKey = `cart:${userId}`;
+
+    // Проверяем наличие корзины в Redis
     const cachedCart = await this.redis.get(cacheKey);
 
     if (cachedCart) {
       try {
-        return JSON.parse(cachedCart);
+        return JSON.parse(cachedCart) as Cart;
       } catch (e) {
-        console.error('Cart cache parsing error', e);
+        console.error('Ошибка парсинга кэша корзины:', e);
       }
     }
 
-    // Получаем из БД
-    const sql = `
-      SELECT item_id, quantity
-      FROM cart
-      WHERE user_id = $1
-    `;
-
+    // Если кэша нет, запрашиваем данные из БД
     try {
-      const result = await this.pool.query<{ item_id: number; quantity: number }>(sql, [userId]);
+      const result = await this.pool.query<{
+        item_id: number;
+        quantity: number;
+      }>(CartQueries.SELECT_CART, [userId]);
+
       const products: { [productId: number]: ProductCart } = {};
 
-      result.rows.forEach(row => {
+      // Формируем объект продуктов
+      result.rows.forEach((row) => {
         products[row.item_id] = { id: row.item_id, qty: row.quantity };
       });
 
       const cart: Cart = { total: 0, products };
 
-      // Кэшируем в Redis
+      // Сохраняем корзину в Redis
       await this.redis.set(cacheKey, JSON.stringify(cart));
-      await this.redis.expire(cacheKey, this.CACHE_TTL);
+      await this.redis.expire(cacheKey, CartConfig.CACHE_TTL_SECONDS);
 
       return cart;
     } catch (error) {
-      console.error('Error fetching cart from DB', error);
+      console.error('Ошибка получения корзины из БД:', error);
       return { total: 0, products: {} };
     }
   }
 
+  // Сохранение корзины пользователя
   async saveCart(userId: number, cart: Cart): Promise<Cart> {
-    const cacheKey = `cart:${userId}`;
+    const cartCacheKey = `cart:${userId}`;
+    try {
+      // Очищаем старую корзину в БД
+      await this.pool.query(CartQueries.DELETE_CART, [userId]);
 
-    // Очищаем старую корзину в БД
-    await this.pool.query('DELETE FROM cart WHERE user_id = $1', [userId]);
+      // Сохраняем новые элементы корзины
+      for (const product of Object.values(cart.products)) {
+        await this.pool.query(CartQueries.INSERT_CART_ITEM, [
+          userId,
+          product.id,
+          product.qty,
+        ]);
+      }
 
-    // Сохраняем новые данные
-    for (const product of Object.values(cart.products)) {
-      const sql = `
-        INSERT INTO cart (user_id, item_id, quantity)
-        VALUES ($1, $2, $3)
-      `;
-      await this.pool.query(sql, [userId, product.id, product.qty]);
+      // Обновляем кэш в Redis
+      await this.redis.set(cartCacheKey, JSON.stringify(cart));
+      await this.redis.expire(cartCacheKey, CartConfig.CACHE_TTL_SECONDS);
+
+      return cart;
+
+    } catch (error) {
+      console.error('Ошибка сохранения корзины:', error);
+      throw error;
     }
-
-    // Обновляем кэш
-    await this.redis.set(cacheKey, JSON.stringify(cart));
-    await this.redis.expire(cacheKey, this.CACHE_TTL);
-
-    return cart;
   }
 
   async clearCache(userId: number): Promise<void> {
-    await this.redis.del(`cart:${userId}`);
+    const cartCacheKey = `cart:${userId}`;
+    await this.redis.del(cartCacheKey);
   }
 }
