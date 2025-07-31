@@ -155,25 +155,37 @@ export class CatalogService extends BaseService implements ICatalogService {
                 console.log('📸 Reply markup:', response.reply_markup?.inline_keyboard);
                 
                 try {
+                    // Конвертируем InlineKeyboard в простой объект для editMessageMedia
+                    const reply_markup = {
+                        inline_keyboard: response.reply_markup.inline_keyboard
+                    };
+                    
                     console.log('🔍 Sending to Telegram:', {
                         type: 'photo',
                         media: response.photo,
                         caption: response.caption,
                         parse_mode: 'HTML',
-                        reply_markup: response.reply_markup,
-                        reply_markup_type: typeof response.reply_markup,
-                        reply_markup_keys: response.reply_markup ? Object.keys(response.reply_markup) : 'null'
+                        reply_markup: reply_markup,
+                        reply_markup_type: typeof reply_markup,
+                        reply_markup_keys: reply_markup ? Object.keys(reply_markup) : 'null'
                     });
                     
-                    // Попробуем отправить как текстовое сообщение с клавиатурой
-                    await ctx.editMessageText(response.caption, {
+                    // Отправляем текстовое сообщение с картинкой в описании
+                    const captionWithImage = `${response.caption}\n\n🖼️ <a href="${response.photo}">Посмотреть изображение</a>`;
+                    await ctx.editMessageText(captionWithImage, {
                         parse_mode: 'HTML',
                         reply_markup: response.reply_markup,
+                        disable_web_page_preview: false,
                     });
-                    console.log('✅ Text message sent successfully');
+                    console.log('✅ Text message with image link sent successfully');
                 } catch (photoError) {
-                    console.error('❌ Failed to send text message:', photoError);
-                    this.logger.warn('Failed to send text message', photoError);
+                    console.error('❌ Failed to send photo:', photoError);
+                    this.logger.warn('Failed to send photo, falling back to text', photoError);
+                    // Если не удалось отправить фото, отправляем текстовое сообщение
+                    await ctx.editMessageText(response.caption, {
+                        reply_markup: response.reply_markup,
+                        parse_mode: 'HTML'
+                    });
                 }
             } else {
                 // Иначе отправляем текстовое сообщение
