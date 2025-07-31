@@ -18,6 +18,11 @@ import { CartService } from './services/cart/domain/cart.service';
 import { CatalogService } from './services/catalog/domain/catalog.service';
 import { MenuService } from './services/menu/domain/menu.service';
 
+// Импорты адаптеров корзины
+import { CartRepository } from './services/cart/adapters/cart.repository';
+import { CartView } from './services/cart/adapters/cart.view';
+import { ProductRepository } from './services/cart/adapters/product.repository';
+
 export class BotManager {
     private bot: Bot;
     private logger: Logger;
@@ -82,9 +87,14 @@ export class BotManager {
      * Регистрация всех сервисов
      */
     private registerServices(): void {
-        // Регистрируем все сервисы в Service Registry
+        // Создаем адаптеры корзины
+        const cartRepository = new CartRepository(pool, RedisConn);
+        const productRepository = new ProductRepository(pool);
+        const cartView = new CartView(productRepository);
+        
+        // Создаем сервисы с зависимостями
         this.serviceRegistry.registerService(new OrderService());
-        this.serviceRegistry.registerService(new CartService());
+        this.serviceRegistry.registerService(new CartService(cartRepository, cartView, productRepository));
         this.serviceRegistry.registerService(new CatalogService());
         this.serviceRegistry.registerService(new MenuService());
 

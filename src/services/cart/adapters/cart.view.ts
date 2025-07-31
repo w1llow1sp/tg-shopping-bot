@@ -1,86 +1,80 @@
 /**
- * 🎨 Cart View Adapter
+ * 🎨 Cart View - Primary Adapter
  * 
- * View использует только сервис
- * Реализация порта ICartView для отображения корзины в Telegram
+ * Адаптер для отображения корзины в Telegram
+ * Реализует ICartView
  */
 
 import { InlineKeyboard } from 'grammy';
-import { ICartView, Cart, ICartService } from '../ports/cart.port';
+import { ICartView, Cart, IProductRepository } from '../ports/cart.port';
+
+export type CartResponse = {
+    text: string;
+    reply_markup: InlineKeyboard;
+};
 
 export class CartView implements ICartView {
-    private readonly cartService: ICartService;
+    private productRepository: IProductRepository;
 
-    constructor(cartService: ICartService) {
-        this.cartService = cartService;
+    constructor(productRepository: IProductRepository) {
+        this.productRepository = productRepository;
     }
 
     /**
      * Отобразить корзину пользователя
      */
-    async renderCart(cart: Cart): Promise<any> {
+    async renderCart(cart: Cart): Promise<CartResponse> {
         if (!cart || Object.keys(cart.products).length === 0) {
+            const keyboard = new InlineKeyboard()
+                .text('🏠 На главную', 'main')
+                .text('📋 Каталог', 'catalog:1');
+            
             return {
-                text: '🛒 Ваша корзина пуста\n\nДобавьте товары из каталога!',
-                reply_markup: {
-                    inline_keyboard: [
-                        [
-                            { text: '📋 Каталог', callback_data: 'catalog:1' },
-                            { text: '🏠 Главное меню', callback_data: 'menu' }
-                        ]
-                    ]
-                }
+                text: '🧺 Ваша корзина пуста',
+                reply_markup: keyboard
             };
         }
 
-        let text = '🛒 **Ваша корзина:**\n\n';
-        
-        // Отображаем товары
-        for (const [productId, product] of Object.entries(cart.products)) {
-            text += `• **Товар ID: ${productId}**\n`;
-            text += `  📦 Количество: ${product.qty}\n\n`;
+        let text = '🧺 <b>Ваша корзина:</b>\n\n';
+        const keyboard = new InlineKeyboard();
+
+        // Добавляем товары в корзину
+        for (const product of Object.values(cart.products)) {
+            const productDetail = await this.productRepository.getProduct(product.id);
+            const productName = this.escapeHTML(productDetail.name);
+            const itemTotal = product.qty * productDetail.price;
+            
+            // Название товара
+            text += `📦 <b>${productName}</b>\n`;
+            
+            // Красивое описание товара с расчетом
+            text += `   📊 <b>Количество:</b> ${product.qty} шт.\n`;
+            text += `   💰 <b>Цена за шт:</b> ${productDetail.price} ₽\n`;
+            text += `   🧮 <b>Сумма:</b> ${itemTotal} ₽\n\n`;
+            
+            // Кнопки управления товаром
+            keyboard
+                .text(`${productName}`, `product:${product.id}`).row()
+                .text('❌', `cart:del:${product.id}`)
+                .text('➖', `cart:dec:${product.id}`)
+                .text('➕', `cart:inc:${product.id}`)
+                .row();
         }
 
-        text += `\n💰 **Общая сумма: ${cart.total} ₽**\n`;
-        text += `📦 **Товаров: ${Object.keys(cart.products).length}**\n\n`;
+        // Красивая итоговая сумма
+        text += `\n${'─'.repeat(30)}\n`;
+        text += `💰 <b>ИТОГО К ОПЛАТЕ: ${cart.total} ₽</b>\n`;
+        text += `📦 <b>Товаров в корзине: ${Object.keys(cart.products).length}</b>`;
 
-        const keyboard: any = {
-            inline_keyboard: []
-        };
-
-        // Кнопки для каждого товара
-        for (const [productId, product] of Object.entries(cart.products)) {
-            keyboard.inline_keyboard.push([
-                { 
-                    text: `➖ Товар ${productId}`, 
-                    callback_data: `cart:dec:${productId}` 
-                },
-                { 
-                    text: `➕ Товар ${productId}`, 
-                    callback_data: `cart:inc:${productId}` 
-                }
-            ]);
-            keyboard.inline_keyboard.push([
-                { 
-                    text: `🗑️ Удалить товар ${productId}`, 
-                    callback_data: `cart:del:${productId}` 
-                }
-            ]);
-        }
-
-        // Основные кнопки
-        keyboard.inline_keyboard.push([
-            { text: '📋 Каталог', callback_data: 'catalog:1' },
-            { text: '🗑️ Очистить корзину', callback_data: 'cart:clear' }
-        ]);
-        keyboard.inline_keyboard.push([
-            { text: '📋 Оформить заказ', callback_data: 'order:create' },
-            { text: '🏠 Главное меню', callback_data: 'menu' }
-        ]);
+        // Кнопки навигации
+        keyboard
+            .text('🏠 На главную', 'main')
+            .text('📋 Каталог', 'catalog:1')
+            .row()
+            .text('💳 Оформить заказ', 'order:create');
 
         return {
             text,
-            parse_mode: 'Markdown',
             reply_markup: keyboard
         };
     }
@@ -88,43 +82,30 @@ export class CartView implements ICartView {
     /**
      * Отобразить сообщение об успешном добавлении
      */
-    renderAddSuccess(productName: string): any {
+    renderAddSuccess(productName: string): CartResponse {
+        const keyboard = new InlineKeyboard()
+            .text('🧺 В корзину', 'cart')
+            .text('📋 Каталог', 'catalog:1')
+            .row()
+            .text('🏠 На главную', 'main');
+
         return {
-            text: `✅ **Товар добавлен в корзину!**\n\n📦 **${productName}**\n\nТеперь вы можете:\n• Просмотреть корзину\n• Продолжить покупки\n• Оформить заказ`,
-            parse_mode: 'Markdown',
-            reply_markup: {
-                inline_keyboard: [
-                    [
-                        { text: '🛒 Корзина', callback_data: 'cart' },
-                        { text: '📋 Каталог', callback_data: 'catalog:1' }
-                    ],
-                    [
-                        { text: '📋 Оформить заказ', callback_data: 'order:create' },
-                        { text: '🏠 Главное меню', callback_data: 'menu' }
-                    ]
-                ]
-            }
+            text: `✅ <b>${this.escapeHTML(productName)}</b> добавлен в корзину!`,
+            reply_markup: keyboard
         };
     }
 
     /**
      * Отобразить сообщение об ошибке
      */
-    renderError(message: string): any {
+    renderError(message: string): CartResponse {
+        const keyboard = new InlineKeyboard()
+            .text('🏠 На главную', 'main')
+            .text('📋 Каталог', 'catalog:1');
+
         return {
-            text: `❌ **Ошибка:** ${message}\n\nПопробуйте еще раз или обратитесь к администратору.`,
-            parse_mode: 'Markdown',
-            reply_markup: {
-                inline_keyboard: [
-                    [
-                        { text: '🛒 Корзина', callback_data: 'cart' },
-                        { text: '📋 Каталог', callback_data: 'catalog:1' }
-                    ],
-                    [
-                        { text: '🏠 Главное меню', callback_data: 'menu' }
-                    ]
-                ]
-            }
+            text: `❌ <b>Ошибка:</b> ${this.escapeHTML(message)}`,
+            reply_markup: keyboard
         };
     }
 
@@ -188,15 +169,17 @@ export class CartView implements ICartView {
         };
     }
 
+
+
     /**
-     * Отобразить корзину для пользователя (использует сервис)
+     * Экранирование HTML для безопасного отображения
      */
-    async renderCartForUser(userId: number): Promise<any> {
-        try {
-            const cart = await this.cartService.getCart(userId);
-            return await this.renderCart(cart);
-        } catch (error) {
-            return this.renderError('Не удалось загрузить корзину');
-        }
+    private escapeHTML(text: string): string {
+        return text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 } 

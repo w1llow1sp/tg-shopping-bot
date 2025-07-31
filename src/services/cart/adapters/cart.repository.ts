@@ -1,56 +1,44 @@
 /**
- * 🔌 Cart Repository Adapter (ДОМЕННАЯ ЛОГИКА - САМЫЙ ВАЖНЫЙ!)
+ * 🗄️ Cart Repository - Secondary Adapter
  * 
- * Реализация порта ICartRepository для работы с PostgreSQL и Redis
- * Содержит всю доменную логику корзины
+ * Адаптер для работы с базой данных и кэшем
+ * Реализует ICartRepository
  */
 
 import { Pool } from 'pg';
 import { RedisClientType } from 'redis';
+import { ICartRepository, Cart, ProductCart, CartConfig, CartQueries } from '../ports/cart.port';
 import { ensureConnection } from '../../../db/redis';
-import { 
-    ICartRepository, 
-    Cart, 
-    ProductCart, 
-    CartConfig, 
-    CartQueries,
-    CartError,
-    CartErrorType 
-} from '../ports/cart.port';
-import { Logger } from '../../../shared/logger';
 
 export class CartRepository implements ICartRepository {
-    private readonly pool: Pool;
-    private readonly redis: RedisClientType;
-    private readonly logger: Logger;
+    private pool: Pool;
+    private redis: RedisClientType;
 
     constructor(pool: Pool, redis: RedisClientType) {
         this.pool = pool;
         this.redis = redis;
-        this.logger = Logger.getInstance();
     }
 
     /**
-     * Получить корзину пользователя (доменная логика)
+     * Получить корзину пользователя
      */
     async getCart(userId: number): Promise<Cart> {
-        try {
-            // Обеспечиваем подключение к Redis
-            await ensureConnection();
-            
-            // Проверяем кэш
-            const cacheKey = `cart:${userId}`;
-            const cachedCart = await this.redis.get(cacheKey);
+        await ensureConnection();
+        
+        // Проверяем кэш
+        const cacheKey = `cart:${userId}`;
+        const cachedCart = await this.redis.get(cacheKey);
 
-            if (cachedCart) {
-                try {
-                    return JSON.parse(cachedCart) as Cart;
-                } catch (e) {
-                    this.logger.error('Ошибка парсинга кэша корзины', e as Error);
-                }
+        if (cachedCart) {
+            try {
+                return JSON.parse(cachedCart) as Cart;
+            } catch (e) {
+                console.error('Ошибка парсинга кэша корзины:', e);
             }
+        }
 
-            // Если кэша нет, запрашиваем данные из БД
+        // Если кэша нет, запрашиваем данные из БД
+        try {
             const result = await this.pool.query<{
                 item_id: number;
                 quantity: number;
@@ -58,7 +46,7 @@ export class CartRepository implements ICartRepository {
 
             const products: { [productId: number]: ProductCart } = {};
 
-            // Формируем объект продуктов (доменная логика)
+            // Формируем объект продуктов
             result.rows.forEach((row) => {
                 products[row.item_id] = { id: row.item_id, qty: row.quantity };
             });
@@ -71,19 +59,19 @@ export class CartRepository implements ICartRepository {
 
             return cart;
         } catch (error) {
-            this.logger.error('Ошибка получения корзины из БД', error as Error);
+            console.error('Ошибка получения корзины из БД:', error);
             return { total: 0, products: {} };
         }
     }
 
     /**
-     * Сохранить корзину (доменная логика)
+     * Сохранить корзину
      */
     async saveCart(userId: number, cart: Cart): Promise<Cart> {
+        await ensureConnection();
+        
         const cartCacheKey = `cart:${userId}`;
         try {
-            // Обеспечиваем подключение к Redis
-            await ensureConnection();
             // Очищаем старую корзину в БД
             await this.pool.query(CartQueries.DELETE_CART, [userId]);
 
@@ -102,121 +90,85 @@ export class CartRepository implements ICartRepository {
 
             return cart;
         } catch (error) {
-            this.logger.error('Ошибка сохранения корзины', error as Error);
-            throw new CartError(
-                'Не удалось сохранить корзину',
-                CartErrorType.DATABASE_ERROR,
-                userId
-            );
+            console.error('Ошибка сохранения корзины:', error);
+            throw error;
         }
     }
 
     /**
-     * Добавить товар в корзину (доменная логика)
+     * Добавить товар в корзину
      */
     async addItem(userId: number, productId: number, quantity: number): Promise<void> {
-        try {
-            const cart = await this.getCart(userId);
-            
-            if (cart.products[productId]) {
-                cart.products[productId].qty += quantity;
-            } else {
-                cart.products[productId] = { id: productId, qty: quantity };
-            }
-
-            await this.saveCart(userId, cart);
-        } catch (error) {
-            this.logger.error('Ошибка добавления товара в корзину', error as Error);
-            throw new CartError(
-                'Не удалось добавить товар в корзину',
-                CartErrorType.DATABASE_ERROR,
-                userId,
-                productId
-            );
+        const cart = await this.getCart(userId);
+        
+        if (cart.products[productId]) {
+            cart.products[productId].qty += quantity;
+        } else {
+            cart.products[productId] = { id: productId, qty: quantity };
         }
+
+        await this.saveCart(userId, cart);
     }
 
     /**
-     * Удалить товар из корзины (доменная логика)
+     * Удалить товар из корзины
      */
     async removeItem(userId: number, productId: number): Promise<void> {
-        try {
-            const cart = await this.getCart(userId);
-            
-            if (cart.products[productId]) {
-                delete cart.products[productId];
-                await this.saveCart(userId, cart);
-            }
-        } catch (error) {
-            this.logger.error('Ошибка удаления товара из корзины', error as Error);
-            throw new CartError(
-                'Не удалось удалить товар из корзины',
-                CartErrorType.DATABASE_ERROR,
-                userId,
-                productId
-            );
+        const cart = await this.getCart(userId);
+        
+        if (cart.products[productId]) {
+            delete cart.products[productId];
+            await this.saveCart(userId, cart);
         }
     }
 
     /**
-     * Обновить количество товара (доменная логика)
+     * Обновить количество товара
      */
     async updateItemQuantity(userId: number, productId: number, quantity: number): Promise<void> {
-        try {
-            const cart = await this.getCart(userId);
-            
-            if (cart.products[productId]) {
-                if (quantity <= 0) {
-                    delete cart.products[productId];
-                } else {
-                    cart.products[productId].qty = quantity;
-                }
-                await this.saveCart(userId, cart);
+        const cart = await this.getCart(userId);
+        
+        if (cart.products[productId]) {
+            if (quantity <= 0) {
+                delete cart.products[productId];
+            } else {
+                cart.products[productId].qty = quantity;
             }
-        } catch (error) {
-            this.logger.error('Ошибка обновления количества товара', error as Error);
-            throw new CartError(
-                'Не удалось обновить количество товара',
-                CartErrorType.DATABASE_ERROR,
-                userId,
-                productId
-            );
+            await this.saveCart(userId, cart);
         }
     }
 
     /**
-     * Очистить корзину (доменная логика)
+     * Очистить корзину
      */
     async clearCart(userId: number): Promise<void> {
+        await ensureConnection();
+        
         try {
             await this.pool.query(CartQueries.DELETE_CART, [userId]);
             await this.clearCache(userId);
         } catch (error) {
-            this.logger.error('Ошибка очистки корзины', error as Error);
-            throw new CartError(
-                'Не удалось очистить корзину',
-                CartErrorType.DATABASE_ERROR,
-                userId
-            );
+            console.error('Ошибка очистки корзины:', error);
+            throw error;
         }
     }
 
     /**
-     * Очистить кэш корзины (доменная логика)
+     * Очистить кэш корзины
      */
     async clearCache(userId: number): Promise<void> {
-        const cartCacheKey = `cart:${userId}`;
         await ensureConnection();
+        
+        const cartCacheKey = `cart:${userId}`;
         await this.redis.del(cartCacheKey);
     }
 
     /**
-     * Рассчитать общую стоимость корзины (доменная логика)
+     * Рассчитать общую стоимость корзины
      */
     async calculateTotal(cart: Cart): Promise<number> {
         let total = 0;
         for (const product of Object.values(cart.products)) {
-            // Получаем цену из кэша или БД
             const price = await this.getCachedPrice(product.id);
             total += product.qty * price;
         }
@@ -224,37 +176,34 @@ export class CartRepository implements ICartRepository {
     }
 
     /**
-     * Получение цены продукта с кэшированием (доменная логика)
+     * Получение цены продукта с кэшированием
      */
     private async getCachedPrice(productId: number): Promise<number> {
-        const cacheKey = `product:price:${productId}`;
+        await ensureConnection();
         
-        try {
-            // Обеспечиваем подключение к Redis
-            await ensureConnection();
-            const cachedPrice = await this.redis.get(cacheKey);
-            if (cachedPrice) {
-                return parseFloat(cachedPrice);
-            }
+        const priceCacheKey = `product:price:${productId}`;
+        const cachedPrice = await this.redis.get(priceCacheKey);
 
-            // Если кэша нет, получаем из БД
-            const result = await this.pool.query(
-                'SELECT price FROM products WHERE id = $1',
-                [productId]
-            );
-
-            if (result.rows.length > 0) {
-                const price = result.rows[0].price;
-                // Сохраняем в кэш
-                await this.redis.set(cacheKey, price.toString());
-                await this.redis.expire(cacheKey, CartConfig.PRICE_CACHE_TTL_SECONDS);
-                return price;
-            }
-
-            return 0;
-        } catch (error) {
-            this.logger.error('Ошибка получения цены товара', error as Error);
-            return 0;
+        if (cachedPrice) {
+            return parseFloat(cachedPrice);
         }
+
+        // Если цены нет в кэше, получаем из БД
+        const result = await this.pool.query(
+            'SELECT price FROM catalog WHERE id = $1',
+            [productId]
+        );
+
+        if (result.rows.length === 0) {
+            throw new Error(`Product with ID ${productId} not found`);
+        }
+
+        const price = result.rows[0].price;
+        
+        // Кэшируем цену
+        await this.redis.set(priceCacheKey, price.toString());
+        await this.redis.expire(priceCacheKey, CartConfig.PRICE_CACHE_TTL_SECONDS);
+
+        return price;
     }
 } 

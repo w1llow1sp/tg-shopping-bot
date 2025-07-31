@@ -1,6 +1,6 @@
 import { Bot } from 'grammy';
 import { Logger } from './logger';
-import { IService } from './service.registry';
+import { IService, ServiceRegistry } from './service.registry';
 
 /**
  * 🔧 Base Service
@@ -53,5 +53,12 @@ export abstract class BaseService implements IService {
             throw new Error(`Bot not initialized for service: ${this.name}`);
         }
         return this.bot;
+    }
+
+    /**
+     * Получение ServiceRegistry
+     */
+    protected getServiceRegistry(): ServiceRegistry {
+        return ServiceRegistry.getInstance();
     }
 } 
