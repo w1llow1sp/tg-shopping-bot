@@ -42,7 +42,7 @@ export class CatalogItem {
         // 1. Первый ряд - кнопка добавления в корзину или уведомления
         if (product.itemsavailable === 0) {
             console.log('Adding notify stock button');
-            keyboard.text('🔔 Уведомить о поступлении', 'notify:stock').row();
+            keyboard.text('🔔 Уведомить о поступлении', `notify:stock:subscribe:${product.id}`).row();
         } else {
             if (isAdded) {
                 console.log('Adding "in cart" button');

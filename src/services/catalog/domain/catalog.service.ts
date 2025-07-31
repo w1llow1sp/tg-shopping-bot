@@ -252,22 +252,74 @@ export class CatalogService extends BaseService implements ICatalogService {
 
     private async handleNotifyStockCallback(ctx: any): Promise<void> {
         try {
-            console.log('🔔 Notify stock callback triggered');
-            this.logger.info('Notify stock callback triggered');
+            const callbackData = ctx.callbackQuery?.data;
+            console.log('🔔 Notify stock callback triggered:', callbackData);
+            this.logger.info('Notify stock callback triggered', { callbackData });
             
-            // TODO: Добавить логику уведомления о поступлении
-            // const notificationService = this.getServiceRegistry().getService('NotificationService');
-            // await notificationService.addStockNotification(ctx.from?.id, productId);
+            // Парсим ID товара из callback_data
+            const productMatch = callbackData?.match(/notify:stock:subscribe:(\d+)/);
+            if (!productMatch) {
+                await ctx.answerCallbackQuery({
+                    text: '❌ Некорректный ID товара',
+                    show_alert: true,
+                });
+                return;
+            }
+            
+            const productId = parseInt(productMatch[1], 10);
+            const userId = ctx.from?.id;
+            
+            if (!userId) {
+                await ctx.answerCallbackQuery({
+                    text: '❌ Ошибка: пользователь не найден',
+                    show_alert: true,
+                });
+                return;
+            }
+            
+            // Получаем сервис уведомлений
+            const serviceRegistry = this.getServiceRegistry();
+            const allServices = serviceRegistry.getAllServices();
+            console.log('🔍 Available services:', Array.from(allServices.keys()));
+            console.log('🔍 Service count:', allServices.size);
+            
+            const notificationService = serviceRegistry.getService('NotificationService') as any;
+            console.log('🔍 NotificationService found:', !!notificationService);
+            console.log('🔍 NotificationService type:', typeof notificationService);
+            console.log('🔍 NotificationService methods:', notificationService ? Object.getOwnPropertyNames(Object.getPrototypeOf(notificationService)) : 'null');
+            
+            if (notificationService && typeof notificationService.subscribeToStockAlert === 'function') {
+                console.log('🔍 Calling subscribeToStockAlert...');
+                await notificationService.subscribeToStockAlert(userId, productId);
+                console.log('🔍 subscribeToStockAlert completed');
+            } else {
+                console.error('❌ NotificationService not available or missing subscribeToStockAlert method');
+                throw new Error('NotificationService not available');
+            }
             
             await ctx.answerCallbackQuery({
-                text: '🔔 Мы сообщим вам как товар появится на складе',
+                text: '🔔 Подписка оформлена! Мы уведомим вас о поступлении.',
                 show_alert: true,
             });
             
         } catch (error) {
             this.logger.error('Error handling notify stock callback', error as Error);
+            
+            // Показываем конкретную ошибку пользователю
+            let errorMessage = '❌ Ошибка при подписке на уведомления';
+            
+            if (error instanceof Error) {
+                if (error.message.includes('уже подписаны')) {
+                    errorMessage = '🔔 Вы уже подписаны на уведомления об этом товаре';
+                } else if (error.message.includes('не найдена')) {
+                    errorMessage = '❌ Подписка не найдена';
+                } else {
+                    errorMessage = `❌ ${error.message}`;
+                }
+            }
+            
             await ctx.answerCallbackQuery({
-                text: '❌ Ошибка при подписке на уведомления',
+                text: errorMessage,
                 show_alert: true,
             });
         }

@@ -292,12 +292,12 @@ export class CartService extends BaseService implements ICartService {
 
             const cart = await this.getCart(userId);
             const response = await this.cartView.renderCart(cart);
-
+            
             await ctx.editMessageText(response.text, {
                 reply_markup: response.reply_markup,
                 parse_mode: 'HTML'
             });
-
+            
             await ctx.answerCallbackQuery();
         } catch (error) {
             this.logger.error('Error handling cart', error as Error);

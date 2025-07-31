@@ -23,6 +23,16 @@ import { CartRepository } from './services/cart/adapters/cart.repository';
 import { CartView } from './services/cart/adapters/cart.view';
 import { ProductRepository } from './services/cart/adapters/product.repository';
 
+// Импорты адаптеров каталога
+import { CatalogRepository } from './services/catalog/adapters/catalog.repository';
+
+// Импорты адаптеров уведомлений
+import { NotificationRepository } from './services/notifications/adapters/notification.repository';
+import { NotificationView } from './services/notifications/adapters/notification.view';
+import { NotificationTypeRepository } from './services/notifications/adapters/notification.type.repository';
+import { NotificationService } from './services/notifications/domain/notification.service';
+import { StockEventService } from './services/notifications/domain/stock.event.service';
+
 export class BotManager {
     private bot: Bot;
     private logger: Logger;
@@ -92,11 +102,29 @@ export class BotManager {
         const productRepository = new ProductRepository(pool);
         const cartView = new CartView(productRepository);
         
+        // Создаем адаптеры каталога
+        const catalogRepository = new CatalogRepository(pool);
+        
+        // Создаем адаптеры уведомлений
+        const notificationRepository = new NotificationRepository(pool);
+        const notificationView = new NotificationView();
+        const notificationTypeRepository = new NotificationTypeRepository(pool);
+        
         // Создаем сервисы с зависимостями
         this.serviceRegistry.registerService(new OrderService());
         this.serviceRegistry.registerService(new CartService(cartRepository, cartView, productRepository));
         this.serviceRegistry.registerService(new CatalogService());
         this.serviceRegistry.registerService(new MenuService());
+        
+        // Создаем сервис уведомлений
+        const notificationService = new NotificationService(notificationRepository, notificationView, notificationTypeRepository, catalogRepository, this.bot);
+        console.log('🔧 Creating NotificationService with name:', notificationService.name);
+        this.serviceRegistry.registerService(notificationService);
+        
+        // Создаем сервис обработки событий изменения количества товаров
+        const stockEventService = new StockEventService(pool, notificationService);
+        console.log('🔧 Creating StockEventService with name:', stockEventService.name);
+        this.serviceRegistry.registerService(stockEventService);
 
         this.logger.info('All services registered');
     }

@@ -34,8 +34,10 @@ export class ServiceRegistry {
      * Регистрация сервиса
      */
     registerService(service: IService): void {
+        console.log(`🔧 Registering service: ${service.name}`);
         this.services.set(service.name, service);
         this.logger.info(`Service registered: ${service.name}`);
+        console.log(`🔧 Total services registered: ${this.services.size}`);
     }
 
     /**
@@ -80,7 +82,11 @@ export class ServiceRegistry {
      * Получение сервиса по имени
      */
     getService(name: string): IService | undefined {
-        return this.services.get(name);
+        console.log(`🔍 Getting service: ${name}`);
+        console.log(`🔍 Available services:`, Array.from(this.services.keys()));
+        const service = this.services.get(name);
+        console.log(`🔍 Service found:`, !!service);
+        return service;
     }
 
     /**

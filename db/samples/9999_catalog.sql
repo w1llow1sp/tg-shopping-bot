@@ -137,6 +137,17 @@ VALUES (
         'https://greenisland.ru/upload/iblock/c7f/c7f44c04b74eb7e72fcaa0d8ad8ac353.jpeg',
         3);
 
+-- Добавляем пустые таблицы уведомлений для тестирования
+-- Таблица notification_types уже создана в миграции с базовыми типами
+
+-- Добавляем тестовые уведомления
+INSERT INTO notifications (user_id, type_id, product_id, message, metadata) VALUES
+(743302481, 1, 4, 'Подписка на уведомления о поступлении товара "Удобрение"', '{"product_id": 4, "subscription_type": "stock_alert"}'),
+(743302481, 1, 2, 'Подписка на уведомления о поступлении товара "Вермикулит 3л"', '{"product_id": 2, "subscription_type": "stock_alert"}'),
+(123456789, 1, 1, 'Подписка на уведомления о поступлении товара "Грунт Мечта ботаника"', '{"product_id": 1, "subscription_type": "stock_alert"}');
+
 -- migrate:down
+DELETE FROM notifications;
+DELETE FROM stock_events;
 DELETE
 FROM public.catalog;
