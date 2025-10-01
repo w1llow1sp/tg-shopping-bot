@@ -8,10 +8,13 @@ services:
     environment:
         - NODE_ENV
         - POSTGRESQL_DSN
+        - REDIS_DSN
         - WEBHOOK_URL
         - BOT_TOKEN
     depends_on:
       postgres:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     ports:
         - "3000:3000"

@@ -19,6 +19,15 @@ export async function initializePool(): Promise<void> {
     }
 }
 
+export async function closePool(): Promise<void> {
+    try {
+        await pool.end();
+        console.log('PostgreSQL pool closed successfully');
+    } catch (err) {
+        console.error('Error closing PostgreSQL pool:', err);
+    }
+}
+
 export async function query<T = any>(text: string, params?: any[]): Promise<T[]> {
     try {
         const res = await pool.query(text, params);

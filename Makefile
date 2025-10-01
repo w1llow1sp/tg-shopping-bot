@@ -86,7 +86,7 @@ lint:
 	npx eslint .  # TODO: fix it
 
 utils/tuna/up:
-	tuna http 3000 --subdomain=tg-shop
+	tuna http 3000 
 
 .check-node:
 	@if ! node --version | grep -q $(NODE_VERSION); then \
