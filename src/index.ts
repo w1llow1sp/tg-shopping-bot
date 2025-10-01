@@ -4,12 +4,12 @@ import { botManager, bot, WEBHOOK_PATH } from './bot';
 import * as pg from './db/pg';
 import * as redis from './db/redis';
 import { env } from './consts';
-import { Logger } from './shared/logger';
+import { Logger, ILogger } from './shared/logger';
 import { HealthChecker } from './shared/health.checker';
 
 class Application {
     private app: express.Application;
-    private logger: Logger;
+    private logger: ILogger;
     private port: number;
     private healthChecker: HealthChecker;
 
@@ -84,8 +84,9 @@ class Application {
             await pg.initializePool();
             this.logger.info('PostgreSQL connection initialized');
             
-            // Redis будет подключаться лениво при первом использовании
-            this.logger.info('Redis will be connected on first use');
+            // Проверяем подключение к Redis при старте
+            await redis.initializeConnection();
+            this.logger.info('Redis connection initialized');
         } catch (error) {
             this.logger.error('Failed to initialize database connections', error as Error);
             throw error;
@@ -107,7 +108,18 @@ class Application {
             this.logger.info(`Received ${signal}, shutting down gracefully...`);
             
             try {
+                // Закрываем бота
                 await botManager.shutdown();
+                this.logger.info('Bot manager shut down successfully');
+                
+                // Закрываем подключения к БД
+                await pg.closePool();
+                this.logger.info('PostgreSQL pool closed');
+                
+                // Закрываем Redis
+                await redis.closeConnection();
+                this.logger.info('Redis connection closed');
+                
                 this.logger.info('Application shut down successfully');
                 process.exit(0);
             } catch (error) {

@@ -4,49 +4,13 @@
  * Инфраструктурный слой для маппинга данных
  */
 
-import { UserInfo, SystemStats } from '../ports/menu.port';
+import { SystemStats } from '../ports/menu.port';
 
 /**
  * Маппер для преобразования данных меню
  */
 export class MenuMapper {
-    /**
-     * Преобразовать данные из БД в доменную модель пользователя
-     */
-    static mapUserFromDatabase(dbUser: any): UserInfo {
-        return {
-            id: dbUser.id,
-            name: dbUser.name,
-            nickname: dbUser.nickname,
-            username: dbUser.username
-        };
-    }
 
-    /**
-     * Преобразовать массив данных из БД в доменные модели пользователей
-     */
-    static mapUsersArrayFromDatabase(dbUsers: any[]): UserInfo[] {
-        return dbUsers.map(user => this.mapUserFromDatabase(user));
-    }
-
-    /**
-     * Преобразовать доменную модель пользователя в данные для БД
-     */
-    static mapUserToDatabase(user: UserInfo): any {
-        return {
-            id: user.id,
-            name: user.name,
-            nickname: user.nickname,
-            username: user.username
-        };
-    }
-
-    /**
-     * Преобразовать массив доменных моделей пользователей в данные для БД
-     */
-    static mapUsersArrayToDatabase(users: UserInfo[]): any[] {
-        return users.map(user => this.mapUserToDatabase(user));
-    }
 
     /**
      * Преобразовать данные статистики из БД в доменную модель
@@ -110,26 +74,7 @@ export class MenuMapper {
         return username.trim().toLowerCase();
     }
 
-    /**
-     * Создать отображаемое имя пользователя
-     */
-    static createDisplayName(user: UserInfo): string {
-        if (user.nickname) {
-            return `${user.name} (@${user.nickname})`;
-        }
-        return user.name;
-    }
 
-    /**
-     * Создать краткое описание пользователя
-     */
-    static createShortDescription(user: UserInfo, maxLength: number = 50): string {
-        const displayName = this.createDisplayName(user);
-        if (displayName.length <= maxLength) {
-            return displayName;
-        }
-        return displayName.substring(0, maxLength - 3) + '...';
-    }
 
     /**
      * Форматировать статистику пользователей
@@ -190,33 +135,5 @@ export class MenuMapper {
             `🗄️ База данных: ${stats.databaseStatus}`;
     }
 
-    /**
-     * Создать текст списка пользователей
-     */
-    static createUsersListText(users: UserInfo[]): string {
-        if (users.length === 0) {
-            return '👥 **Пользователи**\n\nСписок пользователей пуст.';
-        }
 
-        const usersText = users.map((user, index) => 
-            `${index + 1}. ${this.createDisplayName(user)}`
-        ).join('\n');
-
-        return `👥 **Пользователи** (${users.length})\n\n${usersText}`;
-    }
-
-    /**
-     * Создать текст информации о пользователе
-     */
-    static createUserInfoText(user: UserInfo): string {
-        let text = `👤 **Информация о пользователе**\n\n` +
-            `🆔 ID: ${user.id}\n` +
-            `📝 Имя: ${user.name}`;
-        
-        if (user.nickname) {
-            text += `\n👤 Никнейм: @${user.nickname}`;
-        }
-        
-        return text;
-    }
 } 

@@ -14,11 +14,11 @@ import {
     CatalogErrorType,
     CatalogErrorMessages
 } from '../ports/catalog.port';
-import { Logger } from '../../../shared/logger';
+import { Logger, ILogger } from '../../../shared/logger';
 
 export class CatalogRepository implements ICatalogRepository {
     private readonly pool: Pool;
-    private readonly logger: Logger;
+    private readonly logger: ILogger;
 
     constructor(pool: Pool) {
         this.pool = pool;

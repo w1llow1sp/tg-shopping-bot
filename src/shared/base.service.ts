@@ -1,5 +1,5 @@
 import { Bot } from 'grammy';
-import { Logger } from './logger';
+import { Logger, ILogger } from './logger';
 import { IService, ServiceRegistry } from './service.registry';
 
 /**
@@ -10,7 +10,7 @@ import { IService, ServiceRegistry } from './service.registry';
  */
 export abstract class BaseService implements IService {
     protected bot: Bot | null = null;
-    protected logger: Logger;
+    protected logger: ILogger;
     public abstract readonly name: string;
 
     constructor() {

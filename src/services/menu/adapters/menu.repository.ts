@@ -17,11 +17,11 @@ import {
     WelcomeData,
     MenuConfig
 } from '../ports/menu.port';
-import { Logger } from '../../../shared/logger';
+import { Logger, ILogger } from '../../../shared/logger';
 
 export class MenuRepository implements IMenuRepository {
     private readonly pool: Pool;
-    private readonly logger: Logger;
+    private readonly logger: ILogger;
 
     constructor(pool: Pool) {
         this.pool = pool;

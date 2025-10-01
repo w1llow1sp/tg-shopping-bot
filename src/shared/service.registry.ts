@@ -1,5 +1,5 @@
 import { Bot } from 'grammy';
-import { Logger } from './logger';
+import { Logger, ILogger } from './logger';
 
 /**
  * 🔧 Service Registry
@@ -16,7 +16,7 @@ export interface IService {
 export class ServiceRegistry {
     private static instance: ServiceRegistry;
     private services: Map<string, IService> = new Map();
-    private logger: Logger;
+    private logger: ILogger;
     private bot: Bot | null = null;
 
     private constructor() {

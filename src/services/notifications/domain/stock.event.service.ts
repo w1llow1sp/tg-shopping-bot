@@ -7,7 +7,7 @@
 
 import { Pool } from 'pg';
 import { NotificationService } from './notification.service';
-import { Logger } from '../../../shared/logger';
+import { Logger, ILogger } from '../../../shared/logger';
 import { BaseService } from '../../../shared/base.service';
 
 export interface StockEvent {
@@ -24,7 +24,7 @@ export class StockEventService extends BaseService {
     public readonly name = 'StockEventService';
     private pool: Pool;
     private notificationService: NotificationService;
-    protected logger: Logger;
+    protected logger: ILogger;
     private isProcessing = false;
 
     constructor(pool: Pool, notificationService: NotificationService) {

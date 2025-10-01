@@ -8,7 +8,6 @@
 import { Pool } from 'pg';
 import { RedisClientType } from 'redis';
 import { ICartRepository, Cart, ProductCart, CartConfig, CartQueries } from '../ports/cart.port';
-import { ensureConnection } from '../../../db/redis';
 
 export class CartRepository implements ICartRepository {
     private pool: Pool;
@@ -23,8 +22,6 @@ export class CartRepository implements ICartRepository {
      * Получить корзину пользователя
      */
     async getCart(userId: number): Promise<Cart> {
-        await ensureConnection();
-        
         // Проверяем кэш
         const cacheKey = `cart:${userId}`;
         const cachedCart = await this.redis.get(cacheKey);
@@ -68,8 +65,6 @@ export class CartRepository implements ICartRepository {
      * Сохранить корзину
      */
     async saveCart(userId: number, cart: Cart): Promise<Cart> {
-        await ensureConnection();
-        
         const cartCacheKey = `cart:${userId}`;
         try {
             // Очищаем старую корзину в БД
@@ -142,8 +137,6 @@ export class CartRepository implements ICartRepository {
      * Очистить корзину
      */
     async clearCart(userId: number): Promise<void> {
-        await ensureConnection();
-        
         try {
             await this.pool.query(CartQueries.DELETE_CART, [userId]);
             await this.clearCache(userId);
@@ -157,8 +150,6 @@ export class CartRepository implements ICartRepository {
      * Очистить кэш корзины
      */
     async clearCache(userId: number): Promise<void> {
-        await ensureConnection();
-        
         const cartCacheKey = `cart:${userId}`;
         await this.redis.del(cartCacheKey);
     }
@@ -179,8 +170,6 @@ export class CartRepository implements ICartRepository {
      * Получение цены продукта с кэшированием
      */
     private async getCachedPrice(productId: number): Promise<number> {
-        await ensureConnection();
-        
         const priceCacheKey = `product:price:${productId}`;
         const cachedPrice = await this.redis.get(priceCacheKey);
 

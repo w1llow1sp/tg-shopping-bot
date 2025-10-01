@@ -24,8 +24,14 @@ export async function initializeConnection(): Promise<void> {
     }
 }
 
-export async function ensureConnection(): Promise<void> {
-    if (!isConnected) {
-        await initializeConnection();
+export async function closeConnection(): Promise<void> {
+    try {
+        if (isConnected) {
+            await RedisConn.quit();
+            isConnected = false;
+            console.log('Redis connection closed successfully');
+        }
+    } catch (err) {
+        console.error('Error closing Redis connection:', err);
     }
 }

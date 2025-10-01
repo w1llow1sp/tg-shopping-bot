@@ -1,4 +1,4 @@
-import { Logger } from './logger';
+import { Logger, ILogger } from './logger';
 
 /**
  * 🔍 Health Checker
@@ -6,7 +6,7 @@ import { Logger } from './logger';
  * Проверка состояния здоровья приложения
  */
 export class HealthChecker {
-    private logger: Logger;
+    private logger: ILogger;
 
     constructor() {
         this.logger = Logger.getInstance();

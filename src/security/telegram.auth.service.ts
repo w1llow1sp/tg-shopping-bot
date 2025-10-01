@@ -1,7 +1,6 @@
 import { ITelegramAuthService, TelegramAccessToken, TelegramSecurityConstants } from './telegram.access.token.port';
-import { Logger } from '../shared/logger';
+import { Logger, ILogger } from '../shared/logger';
 import { RedisClientType } from 'redis';
-import { ensureConnection } from '../db/redis';
 
 /**
  * Telegram Authentication Service - адаптер для Access Token паттерна
@@ -12,7 +11,7 @@ import { ensureConnection } from '../db/redis';
  * Адаптировано для Telegram Bot API без JWT
  */
 export class TelegramAuthService implements ITelegramAuthService {
-    private readonly logger: Logger;
+    private readonly logger: ILogger;
     private readonly redis: RedisClientType;
 
     constructor(redis: RedisClientType) {
@@ -38,9 +37,6 @@ export class TelegramAuthService implements ITelegramAuthService {
             // Проверяем, подключен ли Redis
             if (this.redis.isReady) {
                 try {
-                    // Обеспечиваем подключение к Redis
-                    await ensureConnection();
-                    
                     // Проверяем существующую сессию
                     const existingSession = await this.redis.get(sessionKey);
                     if (existingSession) {

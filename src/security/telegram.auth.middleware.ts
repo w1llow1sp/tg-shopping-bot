@@ -1,6 +1,6 @@
 import { Context } from 'grammy';
 import { ITelegramAuthService, TelegramAccessToken } from './telegram.access.token.port';
-import { Logger } from '../shared/logger';
+import { Logger, ILogger } from '../shared/logger';
 
 /**
  * Middleware для автоматической аутентификации Telegram пользователей
@@ -10,7 +10,7 @@ import { Logger } from '../shared/logger';
  */
 export class TelegramAuthMiddleware {
     private readonly authService: ITelegramAuthService;
-    private readonly logger: Logger;
+    private readonly logger: ILogger;
 
     constructor(authService: ITelegramAuthService) {
         this.authService = authService;
@@ -97,13 +97,13 @@ export class TelegramAuthMiddleware {
                     return;
                 }
 
-                const key = `rate_limit:${token.userId}:${ctx.updateType}`;
+                const key = `rate_limit:${token.userId}:${this.getUpdateType(ctx)}`;
                 const currentCount = await this.getRequestCount(key);
                 
                 if (currentCount >= maxRequests) {
                     this.logger.warn('Rate limit exceeded', {
                         userId: token.userId,
-                        action: ctx.updateType,
+                        action: this.getUpdateType(ctx),
                         currentCount,
                         maxRequests
                     });
@@ -136,7 +136,7 @@ export class TelegramAuthMiddleware {
                 this.logger.debug('User activity logged', {
                     userId: token.userId,
                     chatId: token.chatId,
-                    action: ctx.updateType
+                    action: this.getUpdateType(ctx)
                 });
             }
 
@@ -179,6 +179,27 @@ export class TelegramAuthMiddleware {
      */
     static getUserToken(ctx: Context): TelegramAccessToken | null {
         return (ctx as any).userToken || null;
+    }
+
+    /**
+     * Получение типа обновления из контекста
+     */
+    private getUpdateType(ctx: Context): string {
+        if (ctx.message) return 'message';
+        if (ctx.callbackQuery) return 'callback_query';
+        if (ctx.inlineQuery) return 'inline_query';
+        if (ctx.chosenInlineResult) return 'chosen_inline_result';
+        if (ctx.channelPost) return 'channel_post';
+        if (ctx.editedMessage) return 'edited_message';
+        if (ctx.editedChannelPost) return 'edited_channel_post';
+        if (ctx.shippingQuery) return 'shipping_query';
+        if (ctx.preCheckoutQuery) return 'pre_checkout_query';
+        if (ctx.poll) return 'poll';
+        if (ctx.pollAnswer) return 'poll_answer';
+        if (ctx.myChatMember) return 'my_chat_member';
+        if (ctx.chatMember) return 'chat_member';
+        if (ctx.chatJoinRequest) return 'chat_join_request';
+        return 'unknown';
     }
 
     /**

@@ -7,7 +7,7 @@
 import { Bot } from 'grammy';
 import { pool } from './db/pg';
 import { RedisConn } from './db/redis';
-import { Logger } from './shared/logger';
+import { Logger, ILogger } from './shared/logger';
 import { TelegramAuthService } from './security/telegram.auth.service';
 import { TelegramAuthMiddleware } from './security/telegram.auth.middleware';
 import { ServiceRegistry } from './shared/service.registry';
@@ -35,7 +35,7 @@ import { StockEventService } from './services/notifications/domain/stock.event.s
 
 export class BotManager {
     private bot: Bot;
-    private logger: Logger;
+    private logger: ILogger;
     private authService: TelegramAuthService;
     private authMiddleware: TelegramAuthMiddleware;
     private serviceRegistry: ServiceRegistry;
